@@ -1,0 +1,10 @@
+/key.txt
+/TODO.local.md
+/result
+/result-*
+/config.toml
+/.env
+/.venv/
+/.pytest_cache/
+/dist/
+__pycache__/

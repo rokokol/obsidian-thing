@@ -1,0 +1,52 @@
+# Obsidian Thing
+
+Obsidian Thing serves Obsidian vaults over MCP Streamable HTTP. Each vault has its own endpoint and bearer token. The server can read text files and vault instructions without a running Obsidian app
+
+## Run locally
+
+Copy [`config.example.toml`](config.example.toml) to `config.toml`. Set the vault root and the paths that each client may read. An allowed directory grants access to its subtree. Use `"."` to allow the whole vault, except for hidden paths and symbolic links
+
+Set the environment variable named by `token_env` to a random secret. Use a different token for each vault that needs separate access. Start the server with:
+
+```sh
+uv run --locked obsidian-thing --config config.toml
+```
+
+Use the listen address printed by the server and the endpoint `/vaults/<vault_id>/mcp`. Send `Authorization: Bearer <token>` with each request. For remote access, put the server behind HTTPS and set `allowed_hosts` in the TOML file to the host names that the proxy forwards
+
+The server exposes `wiki.allowed`, `wiki.agentsmd`, and `wiki.read`. It does not yet change files or build a search index. See [TODO.md](TODO.md) for the remaining work
+
+## Run with Nix or Docker
+
+Build from a Git checkout with secrets excluded from tracked files. Without Git, copy only `flake.nix`, `flake.lock`, `pyproject.toml`, `VERSION`, and `src/` to a clean directory first. Nix can copy an entire local source tree to its store
+
+```sh
+nix run . -- --config /absolute/path/to/config.toml
+nix build .#docker
+docker load --input result
+```
+
+The image contains the same Nix package as the native command. It does not need a base image or a Nix daemon at runtime
+
+For Docker, set the vault `root` in the config to `/vault`. Mount that path and the config as read-only volumes. Export the variable named by `token_env` before starting the container
+
+```sh
+docker run --rm --read-only --user "$(id -u):$(id -g)" \
+  --publish 127.0.0.1:8765:8765 \
+  --env OBSIDIAN_MCP_NOTES_TOKEN \
+  --volume /absolute/path/to/config.toml:/config.toml:ro \
+  --volume /absolute/path/to/vault:/vault:ro \
+  obsidian-thing:local --config /config.toml --host 0.0.0.0
+```
+
+## Verify
+
+```sh
+uv run --locked pytest -q
+```
+
+To test the loaded Docker image, run the same HTTP checks against a temporary container. The tests use synthetic vaults and do not call model providers
+
+```sh
+OBSIDIAN_MCP_TEST_IMAGE=obsidian-thing:local uv run --locked pytest -q tests/test_http.py
+```

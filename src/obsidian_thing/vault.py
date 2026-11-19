@@ -8,6 +8,7 @@ from typing import NotRequired, TypedDict
 from uuid import uuid4
 
 from .checker import Checker
+from .frontmatter import FrontmatterState, frontmatter_state
 
 
 class FileRevision(TypedDict):
@@ -41,8 +42,10 @@ def _parts(path: str) -> tuple[str, ...]:
 class Vault:
     max_read_bytes = 1_048_576
 
-    def __init__(self, root: Path, allowed: list[str], *, checker: Checker | None = None):
+    def __init__(self, root: Path, allowed: list[str], *, checker: Checker | None = None,
+                 protect_frontmatter: bool = False):
         self.checker = checker
+        self.protect_frontmatter = protect_frontmatter
         self.root = root.resolve(strict=True)
         if not self.root.is_dir():
             raise ValueError('The vault root must be a directory')
@@ -135,7 +138,7 @@ class Vault:
                 if expected_revision is not None:
                     note, mode = self._check_revision(path, parent, name, expected_revision)
                     before = note['content']
-                elif self.checker is not None:
+                elif self.checker is not None or self.protect_frontmatter:
                     try:
                         os.stat(name, dir_fd=parent, follow_symlinks=False)
                     except FileNotFoundError:
@@ -217,6 +220,18 @@ class Vault:
             os.close(trash)
         return trash_id
 
+    @staticmethod
+    def _frontmatter_warnings(before: str | None, after: str) -> list[str]:
+        old = frontmatter_state(before or '')
+        new = frontmatter_state(after)
+        if new is FrontmatterState.INVALID:
+            if old is FrontmatterState.VALID:
+                raise VaultError('The change would make the YAML frontmatter invalid')
+            return ['The YAML frontmatter is invalid']
+        if old is FrontmatterState.VALID and new is FrontmatterState.ABSENT:
+            return ['The change removes the YAML frontmatter']
+        return []
+
     def _store(self, path: str, parent: int, name: str, content: str, mode: int | None,
                *, operation: str, before: str | None) -> MutationResult:
         if '\0' in content:
@@ -227,7 +242,11 @@ class Vault:
             raise VaultError('The content must be UTF-8 text') from None
         if len(data) > self.max_read_bytes:
             raise VaultError('The content exceeds the file size limit')
-        warnings = self.checker.check(operation, path, before, content) if self.checker else []
+        warnings = []
+        if self.protect_frontmatter and name.lower().endswith('.md'):
+            warnings.extend(self._frontmatter_warnings(before, content))
+        if self.checker:
+            warnings.extend(self.checker.check(operation, path, before, content))
         temp = f'.obsidian-thing-{uuid4().hex}'
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
         fd = os.open(temp, flags, 0o600, dir_fd=parent)

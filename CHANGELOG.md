@@ -8,6 +8,7 @@
 - Replace a unique text fragment at a known revision through `wiki.update`
 - Move a file at a known revision to an optional private trash directory through `wiki.delete`
 - Allow trusted Python scripts to warn about or reject a proposed write before it reaches disk
+- Optionally reject writes that make valid YAML frontmatter invalid
 - Index Markdown and plain text for semantic search with Ollama or opt-in OpenRouter
 - Record embedding calls and USD costs in a separate SQLite journal
 

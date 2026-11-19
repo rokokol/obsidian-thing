@@ -155,7 +155,10 @@ def create_app(config: dict) -> Starlette:
                 raise ValueError('Configure a checker only for a writable vault')
             checker = Checker(settings['checker'])
             checker_scripts.add(checker.script)
-        vault = Vault(Path(settings['root']), allowed, checker=checker)
+        protect_frontmatter = settings.get('protect_frontmatter', False)
+        if not isinstance(protect_frontmatter, bool) or (protect_frontmatter and not writable):
+            raise ValueError('Configure protect_frontmatter as a boolean for a writable vault')
+        vault = Vault(Path(settings['root']), allowed, checker=checker, protect_frontmatter=protect_frontmatter)
         roots.append(vault.root)
         trash_dir = None
         if 'trash_dir' in settings:

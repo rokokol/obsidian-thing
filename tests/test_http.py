@@ -43,6 +43,7 @@ def docker_endpoint(image, directory, vaults):
         f'[vaults.{name}]\nroot = "/fixtures/{name}"\n'
         f'allowed = ["notes", "AGENTS.md"]\ntoken_env = "{settings["token_env"]}"\n'
         + ('writable = true\ntrash_dir = "/fixtures/trash"\n' if settings.get('writable') else '')
+        + ('protect_frontmatter = true\n' if settings.get('protect_frontmatter') else '')
         for name, settings in vaults.items()
     ) + ('\n[vaults.first.checker]\nscript = "/fixtures/checker.py"\ntimeout_seconds = 1\n'
          if 'checker' in vaults['first'] else ''))
@@ -80,7 +81,10 @@ def endpoint(tmp_path, monkeypatch, request):
     trash = tmp_path / 'trash'
     trash.mkdir(mode=0o700)
     vaults['first'].update(writable=True, trash_dir=str(trash))
-    if getattr(request, 'param', False):
+    feature = getattr(request, 'param', None)
+    if feature == 'frontmatter':
+        vaults['first']['protect_frontmatter'] = True
+    if feature is True:
         script = tmp_path / 'checker.py'
         script.write_text(CHECKER_SCRIPT)
         vaults['first']['checker'] = {'script': str(script), 'timeout_seconds': 1}
@@ -192,6 +196,63 @@ def test_checker_failure_blocks_writes(endpoint):
                     assert 'private diagnostic' not in str(result.content)
                     assert not (root / path).exists()
                 assert not list((root / 'notes').glob('.obsidian-thing-*'))
+
+    asyncio.run(check())
+
+
+@pytest.mark.parametrize('endpoint', ['frontmatter'], indirect=True)
+def test_frontmatter_guard_compares_complete_markdown_versions(endpoint):
+    url, directory = endpoint
+    path = 'notes/same.md'
+    file = directory / 'first' / path
+    clean = '---\r\ntags: [math, analysis]\r\n---\r\n# Title\r\n'
+    revision = sha256(clean.encode()).hexdigest()
+    file.write_bytes(clean.encode())
+
+    async def check():
+        async with httpx.AsyncClient(headers={'Authorization': 'Bearer first'}) as http:
+            transport = streamable_http_client(f'{url}/first/mcp', http_client=http)
+            async with Client(transport, mode='2026-07-28') as session:
+                async def write(content, expected_revision: str | None = revision, target=path):
+                    return await session.call_tool('wiki.write', {
+                        'path': target, 'content': content, 'expected_revision': expected_revision,
+                    })
+
+                async def update(old, new, rev=revision):
+                    return await session.call_tool('wiki.update', {
+                        'path': path, 'old': old, 'new': new, 'expected_revision': rev,
+                    })
+
+                for content in (
+                    '---\ntags: [math\n---\n# Title\n',
+                    '---\ntags: [math]\n"tags": [analysis]\n---\n# Title\n',
+                    '---\n- math\n- analysis\n---\n# Title\n',
+                    '---\ntags: [math]\n# Title\n',
+                ):
+                    rejected = await write(content)
+                    assert rejected.is_error
+                    assert 'frontmatter' in str(rejected.content).lower()
+                    assert file.read_bytes() == clean.encode()
+                rejected = await update('[math, analysis]', '[math, analysis')
+                assert rejected.is_error and 'frontmatter' in str(rejected.content).lower()
+                assert file.read_bytes() == clean.encode()
+
+                edited = await update('[math, analysis]', '\r\n  - math\r\n  - notes')
+                assert not edited.is_error and 'warnings' not in edited.structured_content
+                stripped = await write('# Title\n', edited.structured_content['revision'])
+                assert not stripped.is_error and stripped.structured_content['warnings']
+                assert file.read_bytes() == b'# Title\n'
+                draft = await write('---\ntags: [math\n---\n# Draft\n', None, 'notes/draft.md')
+                assert not draft.is_error and draft.structured_content['warnings']
+
+                broken = clean.replace('[math, analysis]', '[math')
+                file.write_bytes(broken.encode())
+                nearby = await update('# Title', '# New title', sha256(broken.encode()).hexdigest())
+                assert not nearby.is_error and nearby.structured_content['warnings']
+                fixed = await update('tags: [math\r\n', 'tags: [math]\r\n', nearby.structured_content['revision'])
+                assert not fixed.is_error and 'warnings' not in fixed.structured_content
+                text = await write('---\nnot YAML\n', None, 'notes/raw.txt')
+                assert not text.is_error and 'warnings' not in text.structured_content
 
     asyncio.run(check())
 

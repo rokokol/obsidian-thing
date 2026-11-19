@@ -33,6 +33,7 @@
             build-system = [ pkgs.python3Packages.hatchling ];
             dependencies = [
               pkgs.python3Packages.mcp
+              pkgs.python3Packages.pyyaml
               pkgs.python3Packages.starlette
               pkgs.python3Packages.uvicorn
             ];

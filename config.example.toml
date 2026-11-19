@@ -3,6 +3,7 @@ root = "/path/to/vault"
 allowed = ["AGENTS.md", "Notes"]
 token_env = "OBSIDIAN_MCP_NOTES_TOKEN"
 writable = false
+# protect_frontmatter = true
 # trash_dir = "/path/to/private/trash"
 
 # [vaults.notes.checker]

@@ -13,6 +13,8 @@ from starlette.responses import Response
 from starlette.routing import Mount
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from .embeddings import EmbeddingError
+from .search import Matches, SearchIndex
 from .vault import FileRevision, TextFile, TrashedFile, Vault, VaultError
 
 
@@ -20,7 +22,7 @@ from .vault import FileRevision, TextFile, TrashedFile, Vault, VaultError
 def _tool_errors():
     try:
         yield
-    except VaultError as exc:
+    except (VaultError, EmbeddingError) as exc:
         raise ToolError(str(exc)) from None
 
 
@@ -40,6 +42,7 @@ class RequireBearer:
 
 def vault_server(
     name: str, vault: Vault, *, writable: bool = False, trash_dir: Path | None = None,
+    search: SearchIndex | None = None,
 ) -> MCPServer:
     server = MCPServer(name)
 
@@ -83,7 +86,38 @@ def vault_server(
             with _tool_errors():
                 return vault.delete(path, expected_revision, trash_dir)
 
+    if search is not None:
+        @server.tool(name='wiki.index', description='Index one Markdown or text file. May call the configured embedding provider.')
+        def index(path: str) -> dict[str, str | int]:
+            with _tool_errors():
+                return search.index(path)
+
+        @server.tool(name='wiki.query', description='Search indexed files by semantic similarity to a text query.')
+        def query(text: str, limit: int = 10) -> Matches:
+            with _tool_errors():
+                return search.query(text, limit)
+
+        @server.tool(name='wiki.related', description='Find indexed neighbors of a file. Index its current revision if needed.')
+        def related(path: str, limit: int = 10, min_score: float = 0.0) -> Matches:
+            with _tool_errors():
+                return search.related(path, limit, min_score)
+
     return server
+
+
+def _overlap(first: Path, second: Path) -> bool:
+    return first.is_relative_to(second) or second.is_relative_to(first)
+
+
+def _state_dir(settings: dict) -> Path:
+    value = settings.get('state_dir')
+    if not isinstance(value, str) or not Path(value).is_absolute():
+        raise ValueError('Configure an absolute embedding state_dir')
+    state = Path(value).resolve(strict=True)
+    info = state.stat()
+    if not state.is_dir() or info.st_uid != os.geteuid() or info.st_mode & 0o077:
+        raise ValueError('The embedding state directory must be private and owned by the server user')
+    return state
 
 
 def create_app(config: dict) -> Starlette:
@@ -98,6 +132,8 @@ def create_app(config: dict) -> Starlette:
     servers = []
     roots = []
     trash_dirs = set()
+    state_dirs: list[Path] = []
+    mounted = []
     for name, settings in config['vaults'].items():
         if not re.fullmatch(r'[a-zA-Z0-9_-]+', name):
             raise ValueError('A vault ID must use ASCII letters, digits, underscores, or hyphens')
@@ -122,13 +158,28 @@ def create_app(config: dict) -> Starlette:
             if not trash_dir.is_dir() or trash_dir in trash_dirs:
                 raise ValueError('Configure a separate trash directory for each vault')
             trash_dirs.add(trash_dir)
-        server = vault_server(name, vault, writable=writable, trash_dir=trash_dir)
+        embeddings = settings.get('embeddings')
+        state = None
+        if 'embeddings' in settings:
+            if not isinstance(embeddings, dict):
+                raise ValueError('Configure embeddings as a table')
+            state = _state_dir(embeddings)
+            if any(_overlap(state, other) for other in state_dirs):
+                raise ValueError('Configure separate embedding state directories for each vault')
+            state_dirs.append(state)
+        mounted.append((name, token, vault, writable, trash_dir, embeddings, state))
+
+    if any(_overlap(trash, root) for trash in trash_dirs for root in roots):
+        raise ValueError('The trash and vault directories must not overlap')
+    if any(_overlap(state, other) for state in state_dirs for other in (*roots, *trash_dirs)):
+        raise ValueError('The embedding state directory must not overlap vaults or trash')
+
+    for name, token, vault, writable, trash_dir, embeddings, state in mounted:
+        search = SearchIndex(vault, embeddings, state) if state is not None else None
+        server = vault_server(name, vault, writable=writable, trash_dir=trash_dir, search=search)
         app = server.streamable_http_app(stateless_http=True, json_response=True, transport_security=security)
         routes.append(Mount(f'/vaults/{name}', app=RequireBearer(app, token)))
         servers.append(server)
-
-    if any(trash.is_relative_to(root) or root.is_relative_to(trash) for trash in trash_dirs for root in roots):
-        raise ValueError('The trash and vault directories must not overlap')
 
     @asynccontextmanager
     async def lifespan(app: Starlette):

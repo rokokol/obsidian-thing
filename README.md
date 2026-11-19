@@ -14,7 +14,7 @@ uv run --locked obsidian-thing --config config.toml
 
 Use the listen address printed by the server and the endpoint `/vaults/<vault_id>/mcp`. Send `Authorization: Bearer <token>` with each request. For remote access, put the server behind HTTPS and set `allowed_hosts` in the TOML file to the host names that the proxy forwards
 
-Vaults allow reads by default. Set `writable = true` for a vault to enable `wiki.write` and `wiki.update` for any client with its token. The server does not yet build a search index. See [TODO.md](TODO.md) for the remaining work
+Vaults allow reads by default. Set `writable = true` for a vault to enable `wiki.write` and `wiki.update` for any client with its token. Search is optional. See [TODO.md](TODO.md) for the remaining work
 
 `wiki.write` creates a UTF-8 file in an existing directory when you omit `expected_revision`. To replace a file, pass the revision from `wiki.read`. Run one server process per writable vault. Revision checks do not protect against concurrent edits outside that process or unsaved Obsidian edits
 
@@ -47,6 +47,20 @@ docker run --rm --read-only --user "$(id -u):$(id -g)" \
   --volume /absolute/path/to/config.toml:/config.toml:ro \
   --volume /absolute/path/to/vault:/vault:ro \
   obsidian-thing:local --config /config.toml --host 0.0.0.0
+```
+
+## Semantic search
+
+Enable embeddings per vault with the settings in [`config.example.toml`](config.example.toml). Create a private state directory outside the vault and mount it writable in Docker. Use a separate directory for each vault
+
+Call `wiki.index` to index one Markdown or plain-text file. Use `wiki.query` for a text query or `wiki.related` for neighbors of a note. `wiki.related` indexes the source if needed, but searches only indexed files. The server skips deleted and outdated results. There is no background indexer yet
+
+Ollama requires a loopback endpoint in the server's network namespace. OpenRouter sends text to a cloud provider only when you set `allow_cloud = true` and specify `include_paths`. The vault token then permits indexing within those paths and sending text queries. The request selects one route and requires zero data retention, denies data collection, and disables fallback
+
+Read `<state_dir>/spend.sqlite3` to inspect provider calls. The journal does not store input text, file paths, or keys. `reported` is a price returned by the provider. `estimated` uses the configured rate and the provider's token count. `unknown` means no usable price, and `local` means no API charge is tracked
+
+```sh
+sqlite3 /absolute/path/to/state/spend.sqlite3 'SELECT at, operation, provider, model, status, cost_kind, usd FROM calls ORDER BY id DESC LIMIT 20;'
 ```
 
 ## Verify

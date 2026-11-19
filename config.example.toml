@@ -5,6 +5,10 @@ token_env = "OBSIDIAN_MCP_NOTES_TOKEN"
 writable = false
 # trash_dir = "/path/to/private/trash"
 
+# [vaults.notes.checker]
+# script = "/path/to/trusted/checker.py"
+# timeout_seconds = 2
+
 # [vaults.notes.embeddings]
 # state_dir = "/path/to/private/embedding-state"
 # provider = "ollama"

@@ -44,7 +44,8 @@ def docker_endpoint(image, directory, vaults):
         f'allowed = ["notes", "AGENTS.md"]\ntoken_env = "{settings["token_env"]}"\n'
         + ('writable = true\ntrash_dir = "/fixtures/trash"\n' if settings.get('writable') else '')
         for name, settings in vaults.items()
-    ))
+    ) + ('\n[vaults.first.checker]\nscript = "/fixtures/checker.py"\ntimeout_seconds = 1\n'
+         if 'checker' in vaults['first'] else ''))
     env = [arg for settings in vaults.values() for arg in ('--env', settings['token_env'])]
     container = docker(
         'run', '--detach', '--pull=never', '--read-only', '--user', f'{os.getuid()}:{os.getgid()}',
@@ -63,7 +64,7 @@ def docker_endpoint(image, directory, vaults):
 
 
 @pytest.fixture
-def endpoint(tmp_path, monkeypatch):
+def endpoint(tmp_path, monkeypatch, request):
     vaults = {}
     for name in ('first', 'second'):
         root = tmp_path / name
@@ -79,6 +80,10 @@ def endpoint(tmp_path, monkeypatch):
     trash = tmp_path / 'trash'
     trash.mkdir(mode=0o700)
     vaults['first'].update(writable=True, trash_dir=str(trash))
+    if getattr(request, 'param', False):
+        script = tmp_path / 'checker.py'
+        script.write_text(CHECKER_SCRIPT)
+        vaults['first']['checker'] = {'script': str(script), 'timeout_seconds': 1}
     if image := os.environ.get('OBSIDIAN_MCP_TEST_IMAGE'):
         with docker_endpoint(image, tmp_path, vaults) as url:
             yield url, tmp_path
@@ -97,6 +102,98 @@ def endpoint(tmp_path, monkeypatch):
             server.should_exit = True
             thread.join(timeout=5)
             assert not thread.is_alive()
+
+
+CHECKER_SCRIPT = '''\
+import json
+import os
+import sys
+import time
+
+request = json.load(sys.stdin)
+assert request['version'] == 1
+assert 'TEST_TOKEN_FIRST' not in os.environ
+before, after = request['before'], request['after']
+path = request['path']
+if path.endswith('/timeout.md'):
+    time.sleep(30)
+if path.endswith('/crash.md'):
+    sys.stderr.write('private diagnostic')
+    sys.exit(2)
+if path.endswith('/invalid.md'):
+    print('{"decision":"allow","after":"rewritten"}')
+    sys.exit()
+if path.endswith('/large.md'):
+    print(' ' * 100_000 + '{"decision":"allow"}')
+    sys.exit()
+if path == 'notes/new.md':
+    assert request['operation'] == 'write' and before is None
+if path == 'notes/same.md' and request['operation'] == 'update':
+    assert before == 'LEGACY\\r\\nold\\r\\n' and after == 'LEGACY\\r\\nновый\\r\\n'
+if after.count('LEGACY') > (before or '').count('LEGACY'):
+    print(json.dumps({'decision': 'reject', 'message': 'Remove the new marker'}))
+elif 'LEGACY' in after:
+    print(json.dumps({'decision': 'allow', 'warnings': ['Existing marker remains']}))
+else:
+    print(json.dumps({'decision': 'allow'}))
+'''
+
+
+@pytest.mark.parametrize('endpoint', [True], indirect=True)
+def test_checker_warns_on_old_violations_and_rejects_new_ones(endpoint):
+    url, directory = endpoint
+    root = directory / 'first'
+    path = 'notes/same.md'
+    original = 'LEGACY\r\nold\r\n'.encode()
+    expected = 'LEGACY\r\nновый\r\n'.encode()
+    (root / path).write_bytes(original)
+
+    async def check():
+        async with httpx.AsyncClient(headers={'Authorization': 'Bearer first'}) as http:
+            transport = streamable_http_client(f'{url}/first/mcp', http_client=http)
+            async with Client(transport, mode='2026-07-28') as session:
+                created = await session.call_tool('wiki.write', {'path': 'notes/new.md', 'content': '# New\n'})
+                assert not created.is_error
+                assert created.structured_content == {'path': 'notes/new.md', 'revision': sha256(b'# New\n').hexdigest()}
+                updated = await session.call_tool('wiki.update', {
+                    'path': path, 'old': 'old', 'new': 'новый', 'expected_revision': sha256(original).hexdigest(),
+                })
+                assert not updated.is_error
+                assert updated.structured_content == {
+                    'path': path, 'revision': sha256(expected).hexdigest(), 'warnings': ['Existing marker remains'],
+                }
+                assert (root / path).read_bytes() == expected
+                for target, revision in ((path, sha256(expected).hexdigest()), ('notes/denied.md', None)):
+                    rejected = await session.call_tool('wiki.write', {
+                        'path': target, 'content': 'LEGACY LEGACY', 'expected_revision': revision,
+                    })
+                    assert rejected.is_error
+                    assert 'Remove the new marker' in str(rejected.content)
+                assert (root / path).read_bytes() == expected
+                assert not (root / 'notes/denied.md').exists()
+
+    asyncio.run(check())
+
+
+@pytest.mark.parametrize('endpoint', [True], indirect=True)
+def test_checker_failure_blocks_writes(endpoint):
+    url, directory = endpoint
+    root = directory / 'first'
+
+    async def check():
+        async with httpx.AsyncClient(headers={'Authorization': 'Bearer first'}) as http:
+            transport = streamable_http_client(f'{url}/first/mcp', http_client=http)
+            async with Client(transport, mode='2026-07-28') as session:
+                for case in ('timeout', 'crash', 'invalid', 'large'):
+                    path = f'notes/{case}.md'
+                    result = await session.call_tool('wiki.write', {'path': path, 'content': 'should not be saved'})
+                    assert result.is_error, case
+                    assert 'checker' in str(result.content).lower()
+                    assert 'private diagnostic' not in str(result.content)
+                    assert not (root / path).exists()
+                assert not list((root / 'notes').glob('.obsidian-thing-*'))
+
+    asyncio.run(check())
 
 
 def test_auth_is_per_vault(endpoint):

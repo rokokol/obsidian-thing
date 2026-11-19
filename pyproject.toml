@@ -19,4 +19,4 @@ path = "VERSION"
 pattern = '(?P<version>\S+)'
 
 [tool.hatch.build.targets.sdist]
-only-include = ["src", "tests", "pyproject.toml", "uv.lock", "VERSION", "README.md", "config.example.toml"]
+only-include = ["src", "tests", "docs", "pyproject.toml", "uv.lock", "VERSION", "README.md", "config.example.toml"]

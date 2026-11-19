@@ -24,6 +24,10 @@ Enable `wiki.delete` with `trash_dir` in a writable vault. Use an existing priva
 
 To restore a deletion, read `$trash_dir/<trash_id>/path` for the original vault-relative path. Move the sibling `file` back without overwriting an existing file. The server does not purge the trash
 
+## Documentation
+
+- [Python write checker](docs/checker.md): configure a script to warn about or reject proposed edits
+
 ## Run with Nix or Docker
 
 Build from a Git checkout with secrets excluded from tracked files. Without Git, copy only `flake.nix`, `flake.lock`, `pyproject.toml`, `VERSION`, and `src/` to a clean directory first. Nix can copy an entire local source tree to its store

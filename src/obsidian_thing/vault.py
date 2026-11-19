@@ -4,13 +4,19 @@ from contextlib import contextmanager
 from hashlib import sha256
 from pathlib import Path
 from threading import Lock
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 from uuid import uuid4
+
+from .checker import Checker
 
 
 class FileRevision(TypedDict):
     path: str
     revision: str
+
+
+class MutationResult(FileRevision):
+    warnings: NotRequired[list[str]]
 
 
 class TextFile(FileRevision):
@@ -35,7 +41,8 @@ def _parts(path: str) -> tuple[str, ...]:
 class Vault:
     max_read_bytes = 1_048_576
 
-    def __init__(self, root: Path, allowed: list[str]):
+    def __init__(self, root: Path, allowed: list[str], *, checker: Checker | None = None):
+        self.checker = checker
         self.root = root.resolve(strict=True)
         if not self.root.is_dir():
             raise ValueError('The vault root must be a directory')
@@ -118,15 +125,24 @@ class Vault:
         except OSError:
             raise VaultError('The file does not exist or is not accessible') from None
 
-    def write(self, path: str, content: str, expected_revision: str | None) -> FileRevision:
+    def write(self, path: str, content: str, expected_revision: str | None) -> MutationResult:
         parts = self._allowed_parts(path)
         name = parts[-1]
         try:
             with self._mutation_lock, self._directory(parts[:-1]) as parent:
                 mode = None
+                before = None
                 if expected_revision is not None:
-                    _, mode = self._check_revision(path, parent, name, expected_revision)
-                return self._store(path, parent, name, content, mode)
+                    note, mode = self._check_revision(path, parent, name, expected_revision)
+                    before = note['content']
+                elif self.checker is not None:
+                    try:
+                        os.stat(name, dir_fd=parent, follow_symlinks=False)
+                    except FileNotFoundError:
+                        pass
+                    else:
+                        raise FileExistsError
+                return self._store(path, parent, name, content, mode, operation='write', before=before)
         except FileExistsError:
             raise VaultError('The path already exists; read it before you replace it') from None
         except OSError:
@@ -139,7 +155,7 @@ class Vault:
             raise VaultError('The revision does not match; read the file again')
         return note, mode
 
-    def update(self, path: str, old: str, new: str, expected_revision: str) -> FileRevision:
+    def update(self, path: str, old: str, new: str, expected_revision: str) -> MutationResult:
         parts = self._allowed_parts(path)
         name = parts[-1]
         if not old:
@@ -151,7 +167,8 @@ class Vault:
                 start = content.find(old)
                 if start == -1 or content.find(old, start + 1) != -1:
                     raise VaultError('The old fragment must occur exactly once')
-                return self._store(path, parent, name, content[:start] + new + content[start + len(old):], mode)
+                after = content[:start] + new + content[start + len(old):]
+                return self._store(path, parent, name, after, mode, operation='update', before=content)
         except OSError:
             raise VaultError('Cannot update this path') from None
 
@@ -200,7 +217,8 @@ class Vault:
             os.close(trash)
         return trash_id
 
-    def _store(self, path: str, parent: int, name: str, content: str, mode: int | None) -> FileRevision:
+    def _store(self, path: str, parent: int, name: str, content: str, mode: int | None,
+               *, operation: str, before: str | None) -> MutationResult:
         if '\0' in content:
             raise VaultError('The content must be UTF-8 text without NUL characters')
         try:
@@ -209,6 +227,7 @@ class Vault:
             raise VaultError('The content must be UTF-8 text') from None
         if len(data) > self.max_read_bytes:
             raise VaultError('The content exceeds the file size limit')
+        warnings = self.checker.check(operation, path, before, content) if self.checker else []
         temp = f'.obsidian-thing-{uuid4().hex}'
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
         fd = os.open(temp, flags, 0o600, dir_fd=parent)
@@ -228,4 +247,7 @@ class Vault:
         finally:
             if temp is not None:
                 os.unlink(temp, dir_fd=parent)
-        return {'path': path, 'revision': sha256(data).hexdigest()}
+        result: MutationResult = {'path': path, 'revision': sha256(data).hexdigest()}
+        if warnings:
+            result['warnings'] = warnings
+        return result

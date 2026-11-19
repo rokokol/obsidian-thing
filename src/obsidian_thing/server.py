@@ -13,16 +13,17 @@ from starlette.responses import Response
 from starlette.routing import Mount
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from .checker import Checker, CheckerError
 from .embeddings import EmbeddingError
 from .search import Matches, SearchIndex
-from .vault import FileRevision, TextFile, TrashedFile, Vault, VaultError
+from .vault import MutationResult, TextFile, TrashedFile, Vault, VaultError
 
 
 @contextmanager
 def _tool_errors():
     try:
         yield
-    except (VaultError, EmbeddingError) as exc:
+    except (VaultError, EmbeddingError, CheckerError) as exc:
         raise ToolError(str(exc)) from None
 
 
@@ -65,7 +66,7 @@ def vault_server(
             'Call wiki.agentsmd before your first edit. Create a UTF-8 file if expected_revision '
             'is absent or null. To replace a file, pass its current revision from wiki.read.'
         ))
-        def write(path: str, content: str, expected_revision: str | None = None) -> FileRevision:
+        def write(path: str, content: str, expected_revision: str | None = None) -> MutationResult:
             with _tool_errors():
                 return vault.write(path, content, expected_revision)
 
@@ -73,7 +74,7 @@ def vault_server(
             'Call wiki.agentsmd before your first edit. Replace one exact match for old with new. '
             'Pass the current revision from wiki.read.'
         ))
-        def update(path: str, old: str, new: str, expected_revision: str) -> FileRevision:
+        def update(path: str, old: str, new: str, expected_revision: str) -> MutationResult:
             with _tool_errors():
                 return vault.update(path, old, new, expected_revision)
 
@@ -133,6 +134,7 @@ def create_app(config: dict) -> Starlette:
     roots = []
     trash_dirs = set()
     state_dirs: list[Path] = []
+    checker_scripts: set[Path] = set()
     mounted = []
     for name, settings in config['vaults'].items():
         if not re.fullmatch(r'[a-zA-Z0-9_-]+', name):
@@ -144,10 +146,16 @@ def create_app(config: dict) -> Starlette:
         allowed = settings['allowed']
         if not isinstance(allowed, list) or not all(isinstance(path, str) for path in allowed):
             raise ValueError('Configure allowed paths as a list of strings')
-        vault = Vault(Path(settings['root']), allowed)
         writable = settings.get('writable', False)
         if not isinstance(writable, bool):
             raise ValueError('Configure writable as a boolean')
+        checker = None
+        if 'checker' in settings:
+            if not writable:
+                raise ValueError('Configure a checker only for a writable vault')
+            checker = Checker(settings['checker'])
+            checker_scripts.add(checker.script)
+        vault = Vault(Path(settings['root']), allowed, checker=checker)
         roots.append(vault.root)
         trash_dir = None
         if 'trash_dir' in settings:
@@ -173,6 +181,10 @@ def create_app(config: dict) -> Starlette:
         raise ValueError('The trash and vault directories must not overlap')
     if any(_overlap(state, other) for state in state_dirs for other in (*roots, *trash_dirs)):
         raise ValueError('The embedding state directory must not overlap vaults or trash')
+
+    if any(script.is_relative_to(directory) for script in checker_scripts
+           for directory in (*roots, *trash_dirs, *state_dirs)):
+        raise ValueError('Keep checker scripts outside vaults, trash and embedding state')
 
     for name, token, vault, writable, trash_dir, embeddings, state in mounted:
         search = SearchIndex(vault, embeddings, state) if state is not None else None

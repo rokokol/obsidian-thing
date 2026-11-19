@@ -9,6 +9,8 @@ from uuid import uuid4
 
 from .checker import Checker
 from .frontmatter import FrontmatterState, frontmatter_state
+from .links import Resolver
+from .rules import KNOWN_CHECKS, compare
 
 
 class FileRevision(TypedDict):
@@ -43,9 +45,10 @@ class Vault:
     max_read_bytes = 1_048_576
 
     def __init__(self, root: Path, allowed: list[str], *, checker: Checker | None = None,
-                 protect_frontmatter: bool = False):
+                 protect_frontmatter: bool = False, checks: dict[str, bool] | None = None):
         self.checker = checker
         self.protect_frontmatter = protect_frontmatter
+        self.checks = {name: True for name in KNOWN_CHECKS} if checks is None else checks
         self.root = root.resolve(strict=True)
         if not self.root.is_dir():
             raise ValueError('The vault root must be a directory')
@@ -96,6 +99,24 @@ class Vault:
             yield fd
         finally:
             os.close(fd)
+
+    def visible_files(self) -> list[str]:
+        found: list[str] = []
+        for base, dirs, names in os.walk(self.root, followlinks=False):
+            directory = Path(base)
+            dirs[:] = [name for name in dirs
+                       if not name.startswith('.') and not (directory / name).is_symlink()]
+            for name in names:
+                file = directory / name
+                if name.startswith('.') or file.is_symlink() or not file.is_file():
+                    continue
+                relative = file.relative_to(self.root).as_posix()
+                try:
+                    self._allowed_parts(relative)
+                except VaultError:
+                    continue
+                found.append(relative)
+        return sorted(found)
 
     def _allowed_parts(self, path: str) -> tuple[str, ...]:
         parts = _parts(path)
@@ -245,6 +266,12 @@ class Vault:
         warnings = []
         if self.protect_frontmatter and name.lower().endswith('.md'):
             warnings.extend(self._frontmatter_warnings(before, content))
+        if any(self.checks.values()):
+            resolver = Resolver(self, {path: content}) if self.checks.get('broken_links') else None
+            errors, found = compare(before, content, path, self.checks, resolver)
+            if errors:
+                raise VaultError('The change breaks a vault rule: ' + '; '.join(errors[:6]))
+            warnings.extend(found)
         if self.checker:
             warnings.extend(self.checker.check(operation, path, before, content))
         temp = f'.obsidian-thing-{uuid4().hex}'

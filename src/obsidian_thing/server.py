@@ -15,6 +15,8 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from .checker import Checker, CheckerError
 from .embeddings import EmbeddingError
+from .links import Resolver, iter_links
+from .rules import KNOWN_CHECKS
 from .search import Matches, SearchIndex
 from .vault import MutationResult, TextFile, TrashedFile, Vault, VaultError
 
@@ -61,22 +63,35 @@ def vault_server(
         with _tool_errors():
             return vault.read(path)
 
+    @server.tool(name='wiki.links', description='Resolve every wikilink in a note against this vault.')
+    def links(path: str) -> dict[str, list[dict[str, object]]]:
+        with _tool_errors():
+            note = vault.read(path)
+            resolver = Resolver(vault, {path: note['content']})
+            return {'links': [
+                {'raw': link.raw, 'target': link.target, 'anchor': link.anchor,
+                 'embed': link.embed, 'resolved': resolver.destinations(link.target, path)}
+                for link in iter_links(note['content'])
+            ]}
+
     if writable:
         @server.tool(name='wiki.write', description=(
             'Call wiki.agentsmd before your first edit. Create a UTF-8 file if expected_revision '
             'is absent or null. To replace a file, pass its current revision from wiki.read.'
         ))
-        def write(path: str, content: str, expected_revision: str | None = None) -> MutationResult:
+        def write(path: str, content: str, expected_revision: str | None = None,
+                  all_warnings: bool = False) -> MutationResult:
             with _tool_errors():
-                return vault.write(path, content, expected_revision)
+                return _with_limit(vault.write(path, content, expected_revision), all_warnings)
 
         @server.tool(name='wiki.update', description=(
             'Call wiki.agentsmd before your first edit. Replace one exact match for old with new. '
             'Pass the current revision from wiki.read.'
         ))
-        def update(path: str, old: str, new: str, expected_revision: str) -> MutationResult:
+        def update(path: str, old: str, new: str, expected_revision: str,
+                   all_warnings: bool = False) -> MutationResult:
             with _tool_errors():
-                return vault.update(path, old, new, expected_revision)
+                return _with_limit(vault.update(path, old, new, expected_revision), all_warnings)
 
     if writable and trash_dir is not None:
         @server.tool(name='wiki.delete', description=(
@@ -104,6 +119,31 @@ def vault_server(
                 return search.related(path, limit, min_score)
 
     return server
+
+
+def _with_limit(result: MutationResult, show_all: bool) -> MutationResult:
+    if 'warnings' in result:
+        result = {**result, 'warnings': _limited(list(result['warnings']), show_all)}
+    return result
+
+
+def _checks(settings: object, writable: bool) -> dict[str, bool]:
+    if settings is None:
+        return {}
+    if not isinstance(settings, dict) or set(settings) - set(KNOWN_CHECKS):
+        raise ValueError(f'Configure checks as a table of {", ".join(KNOWN_CHECKS)}')
+    if not all(isinstance(value, bool) for value in settings.values()):
+        raise ValueError('Configure every check as a boolean')
+    if settings and not writable:
+        raise ValueError('Configure checks only for a writable vault')
+    return dict(settings)
+
+
+def _limited(items: list[str], show_all: bool) -> list[str]:
+    limit = 10
+    if show_all or len(items) <= limit:
+        return items
+    return [*items[:limit], f'{len(items) - limit} more warnings; pass all_warnings=true to see them']
 
 
 def _overlap(first: Path, second: Path) -> bool:
@@ -158,7 +198,9 @@ def create_app(config: dict) -> Starlette:
         protect_frontmatter = settings.get('protect_frontmatter', False)
         if not isinstance(protect_frontmatter, bool) or (protect_frontmatter and not writable):
             raise ValueError('Configure protect_frontmatter as a boolean for a writable vault')
-        vault = Vault(Path(settings['root']), allowed, checker=checker, protect_frontmatter=protect_frontmatter)
+        checks = _checks(settings.get('checks'), writable)
+        vault = Vault(Path(settings['root']), allowed, checker=checker, protect_frontmatter=protect_frontmatter,
+                      checks=checks)
         roots.append(vault.root)
         trash_dir = None
         if 'trash_dir' in settings:

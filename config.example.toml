@@ -4,6 +4,12 @@ allowed = ["AGENTS.md", "Notes"]
 token_env = "OBSIDIAN_MCP_NOTES_TOKEN"
 writable = false
 # protect_frontmatter = true
+# [vaults.notes.checks]
+# quotes = true
+# callouts = true
+# broken_links = true
+# bases = true
+# canvas = true
 # trash_dir = "/path/to/private/trash"
 
 # [vaults.notes.checker]

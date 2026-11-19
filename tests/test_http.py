@@ -46,7 +46,9 @@ def docker_endpoint(image, directory, vaults):
         + ('protect_frontmatter = true\n' if settings.get('protect_frontmatter') else '')
         for name, settings in vaults.items()
     ) + ('\n[vaults.first.checker]\nscript = "/fixtures/checker.py"\ntimeout_seconds = 1\n'
-         if 'checker' in vaults['first'] else ''))
+         if 'checker' in vaults['first'] else '')
+        + ('\n[vaults.first.checks]\n' + ''.join(f'{name} = true\n' for name, value in vaults['first'].get('checks', {}).items() if value)
+           if vaults['first'].get('checks') else ''))
     env = [arg for settings in vaults.values() for arg in ('--env', settings['token_env'])]
     container = docker(
         'run', '--detach', '--pull=never', '--read-only', '--user', f'{os.getuid()}:{os.getgid()}',
@@ -84,6 +86,10 @@ def endpoint(tmp_path, monkeypatch, request):
     feature = getattr(request, 'param', None)
     if feature == 'frontmatter':
         vaults['first']['protect_frontmatter'] = True
+    if feature == 'checks':
+        vaults['first']['checks'] = {'quotes': True, 'callouts': True}
+    if feature == 'links':
+        vaults['first']['checks'] = {'broken_links': True}
     if feature is True:
         script = tmp_path / 'checker.py'
         script.write_text(CHECKER_SCRIPT)
@@ -257,6 +263,105 @@ def test_frontmatter_guard_compares_complete_markdown_versions(endpoint):
     asyncio.run(check())
 
 
+@pytest.mark.parametrize('endpoint', ['checks'], indirect=True)
+def test_quote_and_callout_checks_block_only_new_mistakes(endpoint):
+    url, directory = endpoint
+    path = 'notes/same.md'
+    file = directory / 'first' / path
+    original = 'Ёлочки «так» остаются\n\n> [!quorte] Чужой тип\n'
+    file.write_bytes(original.encode())
+    current = {'revision': sha256(original.encode()).hexdigest()}
+
+    async def check():
+        async with httpx.AsyncClient(headers={'Authorization': 'Bearer first'}) as http:
+            transport = streamable_http_client(f'{url}/first/mcp', http_client=http)
+            async with Client(transport, mode='2026-07-28') as session:
+                async def write(content, rev=None, target=path):
+                    return await session.call_tool('wiki.write', {
+                        'path': target, 'content': content,
+                        'expected_revision': current['revision'] if rev is None else rev,
+                    })
+
+                nearby = await write(original + '\nДописан абзац\n')
+                assert not nearby.is_error
+                assert any('Existing [quotes]' in warning for warning in nearby.structured_content['warnings'])
+                assert any('callouts' in warning for warning in nearby.structured_content['warnings'])
+                revision = nearby.structured_content['revision']
+                current['revision'] = revision
+
+                for content in ('Обычный текст «в ёлочках»\n', 'Текст с „лапками“\n'):
+                    rejected = await write(content, revision)
+                    assert rejected.is_error and 'quotes' in str(rejected.content)
+                    assert file.read_bytes() == (original + '\nДописан абзац\n').encode()
+
+                accepted = (
+                    'Вложенная цитата "внешняя «внутренняя» вставка"\n\n'
+                    'Код `«в бэктиках»` не считается\n\n'
+                    '```\n«в фенсе» и [!nope]\n```\n\n'
+                    '> [!note] Известный тип\n\n'
+                    '> [!tip]- Свёрнутый\n'
+                )
+                allowed = await write(accepted, revision)
+                assert not allowed.is_error, allowed.content
+
+    asyncio.run(check())
+
+
+@pytest.mark.parametrize('endpoint', ['links'], indirect=True)
+def test_broken_links_block_new_ones_and_warning_limit(endpoint):
+    url, directory = endpoint
+    root = directory / 'first'
+    path = 'notes/same.md'
+    file = root / path
+    original = 'Работает [[same]], сломана [[старая]]\n\n## Раздел\n'
+    file.write_text(original)
+    current = {'revision': sha256(original.encode()).hexdigest()}
+
+    async def check():
+        async with httpx.AsyncClient(headers={'Authorization': 'Bearer first'}) as http:
+            transport = streamable_http_client(f'{url}/first/mcp', http_client=http)
+            async with Client(transport, mode='2026-07-28') as session:
+                async def write(content):
+                    return await session.call_tool('wiki.write', {
+                        'path': path, 'content': content, 'expected_revision': current['revision'],
+                    })
+
+                nearby = await write(original + '\nДописано\n')
+                assert not nearby.is_error
+                assert any('Existing [broken_links]' in warning for warning in nearby.structured_content['warnings'])
+                current['revision'] = nearby.structured_content['revision']
+
+                broken = await write(original + '\nНовая [[нет такой]] ссылка\n')
+                assert broken.is_error and 'broken_links' in str(broken.content)
+                anchor = await write(original + '\n[[same#Нет раздела]]\n')
+                assert anchor.is_error and 'broken_links' in str(anchor.content)
+                good = await write(original + '\n[[same#Раздел]] и ![[missing.png]]\n')
+                assert good.is_error and 'attachment' in str(good.content)
+                assert file.read_text() == original + '\nДописано\n'
+
+                found = await session.call_tool('wiki.links', {'path': path})
+                resolved = {item['target']: item['resolved'] for item in found.structured_content['links']}
+                assert resolved == {'same': [path], 'старая': []}
+
+                many = '\n'.join(f'[[missing-{index}]]' for index in range(12))
+                (root / 'notes' / 'many.md').write_text(many + '\n')
+                revision = sha256((many + '\n').encode()).hexdigest()
+                capped = await session.call_tool('wiki.write', {
+                    'path': 'notes/many.md', 'content': many + '\nДописано\n', 'expected_revision': revision,
+                })
+                assert not capped.is_error
+                warnings = capped.structured_content['warnings']
+                assert len(warnings) == 11
+                assert warnings[-1].startswith('2 more warnings')
+                everything = await session.call_tool('wiki.update', {
+                    'path': 'notes/many.md', 'old': 'Дописано', 'new': 'Дописано дважды',
+                    'expected_revision': capped.structured_content['revision'], 'all_warnings': True,
+                })
+                assert len(everything.structured_content['warnings']) == 12
+
+    asyncio.run(check())
+
+
 def test_auth_is_per_vault(endpoint):
     url, _ = endpoint
     for headers in ({}, {'Authorization': 'Bearer first'}):
@@ -277,7 +382,7 @@ def test_tools_read_live_files_in_the_selected_vault(endpoint, mode, version):
                 async with Client(transport, mode=mode) as session:
                     assert session.protocol_version == version
                     tools = await session.list_tools()
-                    expected = {'wiki.allowed', 'wiki.agentsmd', 'wiki.read'}
+                    expected = {'wiki.allowed', 'wiki.agentsmd', 'wiki.read', 'wiki.links'}
                     if name == 'first':
                         expected.update(('wiki.write', 'wiki.update', 'wiki.delete'))
                     assert {tool.name for tool in tools.tools} == expected

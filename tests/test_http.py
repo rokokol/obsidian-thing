@@ -42,12 +42,13 @@ def docker_endpoint(image, directory, vaults):
     config.write_text('\n'.join(
         f'[vaults.{name}]\nroot = "/fixtures/{name}"\n'
         f'allowed = ["notes", "AGENTS.md"]\ntoken_env = "{settings["token_env"]}"\n'
+        + ('writable = true\n' if settings.get('writable') else '')
         for name, settings in vaults.items()
     ))
     env = [arg for settings in vaults.values() for arg in ('--env', settings['token_env'])]
     container = docker(
         'run', '--detach', '--pull=never', '--read-only', '--user', f'{os.getuid()}:{os.getgid()}',
-        '--volume', f'{directory}:/fixtures:ro', '--publish', '127.0.0.1::8765', *env,
+        '--volume', f'{directory}:/fixtures', '--publish', '127.0.0.1::8765', *env,
         image, '--config', '/fixtures/config.toml', '--host', '0.0.0.0',
     )
     try:
@@ -75,6 +76,7 @@ def endpoint(tmp_path, monkeypatch):
         var = f'TEST_TOKEN_{name.upper()}'
         monkeypatch.setenv(var, name)
         vaults[name] = {'root': str(root), 'allowed': ['notes', 'AGENTS.md'], 'token_env': var}
+    vaults['first']['writable'] = True
     if image := os.environ.get('OBSIDIAN_MCP_TEST_IMAGE'):
         with docker_endpoint(image, tmp_path, vaults) as url:
             yield url, tmp_path
@@ -115,7 +117,10 @@ def test_tools_read_live_files_in_the_selected_vault(endpoint, mode, version):
                 async with Client(transport, mode=mode) as session:
                     assert session.protocol_version == version
                     tools = await session.list_tools()
-                    assert {tool.name for tool in tools.tools} == {'wiki.allowed', 'wiki.agentsmd', 'wiki.read'}
+                    expected = {'wiki.allowed', 'wiki.agentsmd', 'wiki.read'}
+                    if name == 'first':
+                        expected.add('wiki.write')
+                    assert {tool.name for tool in tools.tools} == expected
                     allowed = await session.call_tool('wiki.allowed')
                     assert set(allowed.structured_content['paths']) == {'notes', 'AGENTS.md'}
                     note = await session.call_tool('wiki.read', {'path': 'notes/same.md'})
@@ -129,5 +134,40 @@ def test_tools_read_live_files_in_the_selected_vault(endpoint, mode, version):
                     for path in ('private.txt', 'notes-backup/file.md', 'notes/../private.txt', 'notes/link.md'):
                         denied = await session.call_tool('wiki.read', {'path': path})
                         assert denied.is_error
+
+    asyncio.run(check())
+
+
+def test_write_requires_current_revision_and_respects_scope(endpoint):
+    url, directory = endpoint
+
+    async def check():
+        async with httpx.AsyncClient(headers={'Authorization': 'Bearer first'}) as http:
+            transport = streamable_http_client(f'{url}/first/mcp', http_client=http)
+            async with Client(transport, mode='2026-07-28') as session:
+                async def write(path, content, **kwargs):
+                    return await session.call_tool('wiki.write', {'path': path, 'content': content, **kwargs})
+
+                path = 'notes/new.md'
+                created = await write(path, 'Новая заметка\n')
+                assert not created.is_error
+                revision = sha256('Новая заметка\n'.encode()).hexdigest()
+                assert created.structured_content == {'path': path, 'revision': revision}
+                assert (await write(path, 'overwrite without revision')).is_error
+                assert (await write(path, 'overwrite stale revision', expected_revision='0' * 64)).is_error
+                assert (directory / 'first' / path).read_bytes() == 'Новая заметка\n'.encode()
+
+                results = await asyncio.gather(*(
+                    write(path, content, expected_revision=revision) for content in ('alpha', 'beta')
+                ))
+                assert sum(not result.is_error for result in results) == 1
+                winner = ('alpha', 'beta')[next(i for i, r in enumerate(results) if not r.is_error)]
+                assert (directory / 'first' / path).read_text() == winner
+
+                for denied in ('private.txt', 'notes/../private.txt', 'notes/.hidden', 'notes/link.md', 'notes/missing/new.md'):
+                    assert (await write(denied, 'blocked')).is_error
+                assert (directory / 'first' / 'notes/link.md').is_symlink()
+                assert (directory / 'first' / 'private.txt').read_text() == 'private'
+                assert not (directory / 'second' / path).exists()
 
     asyncio.run(check())

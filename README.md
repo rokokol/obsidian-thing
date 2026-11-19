@@ -14,7 +14,9 @@ uv run --locked obsidian-thing --config config.toml
 
 Use the listen address printed by the server and the endpoint `/vaults/<vault_id>/mcp`. Send `Authorization: Bearer <token>` with each request. For remote access, put the server behind HTTPS and set `allowed_hosts` in the TOML file to the host names that the proxy forwards
 
-The server exposes `wiki.allowed`, `wiki.agentsmd`, and `wiki.read`. It does not yet change files or build a search index. See [TODO.md](TODO.md) for the remaining work
+Vaults allow reads by default. Set `writable = true` for a vault to enable `wiki.write` for any client with its token. The server does not yet build a search index. See [TODO.md](TODO.md) for the remaining work
+
+`wiki.write` creates a UTF-8 file in an existing directory when you omit `expected_revision`. To replace a file, pass the revision from `wiki.read`. Run one server process per writable vault. Revision checks do not protect against concurrent edits outside that process or unsaved Obsidian edits
 
 ## Run with Nix or Docker
 
@@ -28,7 +30,7 @@ docker load --input result
 
 The image contains the same Nix package as the native command. It does not need a base image or a Nix daemon at runtime
 
-For Docker, set the vault `root` in the config to `/vault`. Mount that path and the config as read-only volumes. Export the variable named by `token_env` before starting the container
+For Docker, set the vault `root` in the config to `/vault`. Mount that path and the config as read-only volumes. Remove `:ro` from the vault mount only if the vault needs writes. Export the variable named by `token_env` before you start the container
 
 ```sh
 docker run --rm --read-only --user "$(id -u):$(id -g)" \

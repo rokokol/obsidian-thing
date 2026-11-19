@@ -1,10 +1,11 @@
 import os
 import re
-from contextlib import AsyncExitStack, asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from hmac import compare_digest
 from pathlib import Path
 
 from mcp.server import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
 from starlette.datastructures import Headers
@@ -12,7 +13,15 @@ from starlette.responses import Response
 from starlette.routing import Mount
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from .vault import TextFile, Vault
+from .vault import FileRevision, TextFile, Vault, VaultError
+
+
+@contextmanager
+def _tool_errors():
+    try:
+        yield
+    except VaultError as exc:
+        raise ToolError(str(exc)) from None
 
 
 class RequireBearer:
@@ -29,7 +38,7 @@ class RequireBearer:
         await self.app(scope, receive, send)
 
 
-def vault_server(name: str, vault: Vault) -> MCPServer:
+def vault_server(name: str, vault: Vault, *, writable: bool = False) -> MCPServer:
     server = MCPServer(name)
 
     @server.tool(name='wiki.allowed', description='List allowed paths relative to this vault.')
@@ -38,11 +47,22 @@ def vault_server(name: str, vault: Vault) -> MCPServer:
 
     @server.tool(name='wiki.agentsmd', description='Read this vault’s instructions before your first edit.')
     def agentsmd() -> TextFile:
-        return vault.read('AGENTS.md')
+        with _tool_errors():
+            return vault.read('AGENTS.md')
 
     @server.tool(name='wiki.read', description='Read a UTF-8 file at a vault-relative path and return its revision.')
     def read(path: str) -> TextFile:
-        return vault.read(path)
+        with _tool_errors():
+            return vault.read(path)
+
+    if writable:
+        @server.tool(name='wiki.write', description=(
+            'Call wiki.agentsmd before your first edit. Create a UTF-8 file if expected_revision '
+            'is absent or null. To replace a file, pass its current revision from wiki.read.'
+        ))
+        def write(path: str, content: str, expected_revision: str | None = None) -> FileRevision:
+            with _tool_errors():
+                return vault.write(path, content, expected_revision)
 
     return server
 
@@ -68,7 +88,10 @@ def create_app(config: dict) -> Starlette:
         if not isinstance(allowed, list) or not all(isinstance(path, str) for path in allowed):
             raise ValueError('Configure allowed paths as a list of strings')
         vault = Vault(Path(settings['root']), allowed)
-        server = vault_server(name, vault)
+        writable = settings.get('writable', False)
+        if not isinstance(writable, bool):
+            raise ValueError('Configure writable as a boolean')
+        server = vault_server(name, vault, writable=writable)
         app = server.streamable_http_app(stateless_http=True, json_response=True, transport_security=security)
         routes.append(Mount(f'/vaults/{name}', app=RequireBearer(app, token)))
         servers.append(server)

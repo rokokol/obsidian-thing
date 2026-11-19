@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Added
+
+- Create and replace UTF-8 files through `wiki.write` in vaults that allow writes explicitly
+
 ## [0.1.0] - 2026-11-19
 
 ### Added

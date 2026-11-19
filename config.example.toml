@@ -2,3 +2,4 @@
 root = "/path/to/vault"
 allowed = ["AGENTS.md", "Notes"]
 token_env = "OBSIDIAN_MCP_NOTES_TOKEN"
+writable = false

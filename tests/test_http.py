@@ -42,7 +42,7 @@ def docker_endpoint(image, directory, vaults):
     config.write_text('\n'.join(
         f'[vaults.{name}]\nroot = "/fixtures/{name}"\n'
         f'allowed = ["notes", "AGENTS.md"]\ntoken_env = "{settings["token_env"]}"\n'
-        + ('writable = true\n' if settings.get('writable') else '')
+        + ('writable = true\ntrash_dir = "/fixtures/trash"\n' if settings.get('writable') else '')
         for name, settings in vaults.items()
     ))
     env = [arg for settings in vaults.values() for arg in ('--env', settings['token_env'])]
@@ -76,7 +76,9 @@ def endpoint(tmp_path, monkeypatch):
         var = f'TEST_TOKEN_{name.upper()}'
         monkeypatch.setenv(var, name)
         vaults[name] = {'root': str(root), 'allowed': ['notes', 'AGENTS.md'], 'token_env': var}
-    vaults['first']['writable'] = True
+    trash = tmp_path / 'trash'
+    trash.mkdir(mode=0o700)
+    vaults['first'].update(writable=True, trash_dir=str(trash))
     if image := os.environ.get('OBSIDIAN_MCP_TEST_IMAGE'):
         with docker_endpoint(image, tmp_path, vaults) as url:
             yield url, tmp_path
@@ -119,7 +121,7 @@ def test_tools_read_live_files_in_the_selected_vault(endpoint, mode, version):
                     tools = await session.list_tools()
                     expected = {'wiki.allowed', 'wiki.agentsmd', 'wiki.read'}
                     if name == 'first':
-                        expected.update(('wiki.write', 'wiki.update'))
+                        expected.update(('wiki.write', 'wiki.update', 'wiki.delete'))
                     assert {tool.name for tool in tools.tools} == expected
                     allowed = await session.call_tool('wiki.allowed')
                     assert set(allowed.structured_content['paths']) == {'notes', 'AGENTS.md'}
@@ -199,5 +201,48 @@ def test_update_replaces_only_a_unique_fragment_at_the_current_revision(endpoint
                 assert result.structured_content == {'path': path, 'revision': sha256(expected).hexdigest()}
                 assert (await update('новый', 'stale')).is_error
                 assert file.read_bytes() == expected
+
+    asyncio.run(check())
+
+
+def test_delete_moves_current_text_to_trash(endpoint):
+    url, directory = endpoint
+    path = 'notes/same.md'
+    file = directory / 'first' / path
+    trash = directory / 'trash'
+    revision = sha256(file.read_bytes()).hexdigest()
+
+    async def check():
+        async with httpx.AsyncClient(headers={'Authorization': 'Bearer first'}) as http:
+            transport = streamable_http_client(f'{url}/first/mcp', http_client=http)
+            async with Client(transport, mode='2026-07-28') as session:
+                async def delete(target, rev):
+                    return await session.call_tool('wiki.delete', {'path': target, 'expected_revision': rev})
+
+                assert (await delete(path, '0' * 64)).is_error
+                assert (await delete('notes/link.md', sha256(b'private').hexdigest())).is_error
+                assert (await delete('AGENTS.md', sha256(b'Rules for first').hexdigest())).is_error
+                assert list(trash.iterdir()) == []
+                assert file.read_bytes() == b'first'
+
+                trash.chmod(0o755)
+                try:
+                    assert (await delete(path, revision)).is_error
+                    assert file.read_bytes() == b'first'
+                    assert list(trash.iterdir()) == []
+                finally:
+                    trash.chmod(0o700)
+
+                result = await delete(path, revision)
+                assert not result.is_error
+                assert result.structured_content['path'] == path
+                assert result.structured_content['revision'] == revision
+                (entry,) = trash.iterdir()
+                assert result.structured_content['trash_id'] == entry.name
+                assert (entry / 'path').read_text() == path
+                assert (entry / 'file').read_bytes() == b'first'
+                assert not file.exists()
+                assert (directory / 'second' / path).read_bytes() == b'second'
+                assert (await delete(path, revision)).is_error
 
     asyncio.run(check())

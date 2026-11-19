@@ -13,7 +13,7 @@ from starlette.responses import Response
 from starlette.routing import Mount
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from .vault import FileRevision, TextFile, Vault, VaultError
+from .vault import FileRevision, TextFile, TrashedFile, Vault, VaultError
 
 
 @contextmanager
@@ -38,7 +38,9 @@ class RequireBearer:
         await self.app(scope, receive, send)
 
 
-def vault_server(name: str, vault: Vault, *, writable: bool = False) -> MCPServer:
+def vault_server(
+    name: str, vault: Vault, *, writable: bool = False, trash_dir: Path | None = None,
+) -> MCPServer:
     server = MCPServer(name)
 
     @server.tool(name='wiki.allowed', description='List allowed paths relative to this vault.')
@@ -72,6 +74,15 @@ def vault_server(name: str, vault: Vault, *, writable: bool = False) -> MCPServe
             with _tool_errors():
                 return vault.update(path, old, new, expected_revision)
 
+    if writable and trash_dir is not None:
+        @server.tool(name='wiki.delete', description=(
+            'Call wiki.agentsmd before your first edit. Move a UTF-8 file to the configured trash. '
+            'Pass the current revision from wiki.read.'
+        ))
+        def delete(path: str, expected_revision: str) -> TrashedFile:
+            with _tool_errors():
+                return vault.delete(path, expected_revision, trash_dir)
+
     return server
 
 
@@ -85,6 +96,8 @@ def create_app(config: dict) -> Starlette:
         raise ValueError('Configure at least one vault')
     routes = []
     servers = []
+    roots = []
+    trash_dirs = set()
     for name, settings in config['vaults'].items():
         if not re.fullmatch(r'[a-zA-Z0-9_-]+', name):
             raise ValueError('A vault ID must use ASCII letters, digits, underscores, or hyphens')
@@ -99,10 +112,23 @@ def create_app(config: dict) -> Starlette:
         writable = settings.get('writable', False)
         if not isinstance(writable, bool):
             raise ValueError('Configure writable as a boolean')
-        server = vault_server(name, vault, writable=writable)
+        roots.append(vault.root)
+        trash_dir = None
+        if 'trash_dir' in settings:
+            value = settings['trash_dir']
+            if not writable or not isinstance(value, str) or not Path(value).is_absolute():
+                raise ValueError('Configure trash_dir as an absolute directory for a writable vault')
+            trash_dir = Path(value).resolve(strict=True)
+            if not trash_dir.is_dir() or trash_dir in trash_dirs:
+                raise ValueError('Configure a separate trash directory for each vault')
+            trash_dirs.add(trash_dir)
+        server = vault_server(name, vault, writable=writable, trash_dir=trash_dir)
         app = server.streamable_http_app(stateless_http=True, json_response=True, transport_security=security)
         routes.append(Mount(f'/vaults/{name}', app=RequireBearer(app, token)))
         servers.append(server)
+
+    if any(trash.is_relative_to(root) or root.is_relative_to(trash) for trash in trash_dirs for root in roots):
+        raise ValueError('The trash and vault directories must not overlap')
 
     @asynccontextmanager
     async def lifespan(app: Starlette):

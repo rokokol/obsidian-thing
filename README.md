@@ -20,6 +20,10 @@ Vaults allow reads by default. Set `writable = true` for a vault to enable `wiki
 
 `wiki.update` replaces a non-empty `old` fragment with `new` at the revision given by `expected_revision`. The fragment must occur exactly once, including overlapping matches
 
+Enable `wiki.delete` with `trash_dir` in a writable vault. Use an existing private directory outside all vaults, owned by the server user. The trash and the file must share a mount. If the move fails, the file stays in the vault. The tool does not remove paths named directly in `allowed`, because the server needs them at startup
+
+To restore a deletion, read `$trash_dir/<trash_id>/path` for the original vault-relative path. Move the sibling `file` back without overwriting an existing file. The server does not purge the trash
+
 ## Run with Nix or Docker
 
 Build from a Git checkout with secrets excluded from tracked files. Without Git, copy only `flake.nix`, `flake.lock`, `pyproject.toml`, `VERSION`, and `src/` to a clean directory first. Nix can copy an entire local source tree to its store
@@ -33,6 +37,8 @@ docker load --input result
 The image contains the same Nix package as the native command. It does not need a base image or a Nix daemon at runtime
 
 For Docker, set the vault `root` in the config to `/vault`. Mount that path and the config as read-only volumes. Remove `:ro` from the vault mount only if the vault needs writes. Export the variable named by `token_env` before you start the container
+
+For deletion, mount a common parent of the vault and trash directories as one volume. Set `root` and `trash_dir` to the two subdirectories inside the container
 
 ```sh
 docker run --rm --read-only --user "$(id -u):$(id -g)" \

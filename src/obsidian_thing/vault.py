@@ -17,6 +17,10 @@ class TextFile(FileRevision):
     content: str
 
 
+class TrashedFile(FileRevision):
+    trash_id: str
+
+
 class VaultError(ValueError):
     pass
 
@@ -150,6 +154,51 @@ class Vault:
                 return self._store(path, parent, name, content[:start] + new + content[start + len(old):], mode)
         except OSError:
             raise VaultError('Cannot update this path') from None
+
+    def delete(self, path: str, expected_revision: str, trash_dir: Path) -> TrashedFile:
+        parts = self._allowed_parts(path)
+        if parts in self.rules:
+            raise VaultError('Cannot delete a path named in the allowlist')
+        name = parts[-1]
+        try:
+            with self._mutation_lock, self._directory(parts[:-1]) as parent:
+                note, _ = self._check_revision(path, parent, name, expected_revision)
+                trash_id = self._move_to_trash(parent, name, path, trash_dir)
+        except OSError:
+            raise VaultError('Cannot move this file to the trash; check the directory and mount') from None
+        return {'path': path, 'revision': note['revision'], 'trash_id': trash_id}
+
+    @staticmethod
+    def _move_to_trash(parent: int, name: str, path: str, trash_dir: Path) -> str:
+        flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        trash = os.open(trash_dir, flags)
+        try:
+            info = os.fstat(trash)
+            if info.st_uid != os.geteuid() or info.st_mode & 0o077:
+                raise VaultError('The trash directory must be private and owned by the server user')
+            trash_id = uuid4().hex
+            os.mkdir(trash_id, 0o700, dir_fd=trash)
+            try:
+                entry = os.open(trash_id, flags, dir_fd=trash)
+                try:
+                    metadata = os.open('path', os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=entry)
+                    try:
+                        with os.fdopen(metadata, 'wb') as file:
+                            file.write(os.fsencode(path))
+                            file.flush()
+                            os.fsync(file.fileno())
+                        os.rename(name, 'file', src_dir_fd=parent, dst_dir_fd=entry)
+                    except OSError:
+                        os.unlink('path', dir_fd=entry)
+                        raise
+                finally:
+                    os.close(entry)
+            except OSError:
+                os.rmdir(trash_id, dir_fd=trash)
+                raise
+        finally:
+            os.close(trash)
+        return trash_id
 
     def _store(self, path: str, parent: int, name: str, content: str, mode: int | None) -> FileRevision:
         if '\0' in content:

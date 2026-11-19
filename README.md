@@ -14,9 +14,11 @@ uv run --locked obsidian-thing --config config.toml
 
 Use the listen address printed by the server and the endpoint `/vaults/<vault_id>/mcp`. Send `Authorization: Bearer <token>` with each request. For remote access, put the server behind HTTPS and set `allowed_hosts` in the TOML file to the host names that the proxy forwards
 
-Vaults allow reads by default. Set `writable = true` for a vault to enable `wiki.write` for any client with its token. The server does not yet build a search index. See [TODO.md](TODO.md) for the remaining work
+Vaults allow reads by default. Set `writable = true` for a vault to enable `wiki.write` and `wiki.update` for any client with its token. The server does not yet build a search index. See [TODO.md](TODO.md) for the remaining work
 
 `wiki.write` creates a UTF-8 file in an existing directory when you omit `expected_revision`. To replace a file, pass the revision from `wiki.read`. Run one server process per writable vault. Revision checks do not protect against concurrent edits outside that process or unsaved Obsidian edits
+
+`wiki.update` replaces a non-empty `old` fragment with `new` at the revision given by `expected_revision`. The fragment must occur exactly once, including overlapping matches
 
 ## Run with Nix or Docker
 

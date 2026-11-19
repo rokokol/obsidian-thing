@@ -119,7 +119,7 @@ def test_tools_read_live_files_in_the_selected_vault(endpoint, mode, version):
                     tools = await session.list_tools()
                     expected = {'wiki.allowed', 'wiki.agentsmd', 'wiki.read'}
                     if name == 'first':
-                        expected.add('wiki.write')
+                        expected.update(('wiki.write', 'wiki.update'))
                     assert {tool.name for tool in tools.tools} == expected
                     allowed = await session.call_tool('wiki.allowed')
                     assert set(allowed.structured_content['paths']) == {'notes', 'AGENTS.md'}
@@ -169,5 +169,35 @@ def test_write_requires_current_revision_and_respects_scope(endpoint):
                 assert (directory / 'first' / 'notes/link.md').is_symlink()
                 assert (directory / 'first' / 'private.txt').read_text() == 'private'
                 assert not (directory / 'second' / path).exists()
+
+    asyncio.run(check())
+
+
+def test_update_replaces_only_a_unique_fragment_at_the_current_revision(endpoint):
+    url, directory = endpoint
+    path = 'notes/same.md'
+    file = directory / 'first' / path
+    original = 'aaaa\r\nunique\r\n'
+    file.write_bytes(original.encode())
+    revision = sha256(original.encode()).hexdigest()
+
+    async def check():
+        async with httpx.AsyncClient(headers={'Authorization': 'Bearer first'}) as http:
+            transport = streamable_http_client(f'{url}/first/mcp', http_client=http)
+            async with Client(transport, mode='2026-07-28') as session:
+                async def update(old, new, rev=revision):
+                    return await session.call_tool('wiki.update', {
+                        'path': path, 'old': old, 'new': new, 'expected_revision': rev,
+                    })
+
+                for old in ('absent', 'a', 'aaa', ''):
+                    assert (await update(old, 'wrong')).is_error
+                    assert file.read_bytes() == original.encode()
+                result = await update('unique', 'новый')
+                expected = 'aaaa\r\nновый\r\n'.encode()
+                assert not result.is_error
+                assert result.structured_content == {'path': path, 'revision': sha256(expected).hexdigest()}
+                assert (await update('новый', 'stale')).is_error
+                assert file.read_bytes() == expected
 
     asyncio.run(check())

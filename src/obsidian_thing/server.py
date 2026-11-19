@@ -64,6 +64,14 @@ def vault_server(name: str, vault: Vault, *, writable: bool = False) -> MCPServe
             with _tool_errors():
                 return vault.write(path, content, expected_revision)
 
+        @server.tool(name='wiki.update', description=(
+            'Call wiki.agentsmd before your first edit. Replace one exact match for old with new. '
+            'Pass the current revision from wiki.read.'
+        ))
+        def update(path: str, old: str, new: str, expected_revision: str) -> FileRevision:
+            with _tool_errors():
+                return vault.update(path, old, new, expected_revision)
+
     return server
 
 

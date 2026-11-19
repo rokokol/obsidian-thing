@@ -121,15 +121,35 @@ class Vault:
             with self._mutation_lock, self._directory(parts[:-1]) as parent:
                 mode = None
                 if expected_revision is not None:
-                    with self._entry(parent, name) as fd:
-                        note, mode = self._read_text(path, fd)
-                    if note['revision'] != expected_revision:
-                        raise VaultError('The revision does not match; read the file again')
+                    _, mode = self._check_revision(path, parent, name, expected_revision)
                 return self._store(path, parent, name, content, mode)
         except FileExistsError:
             raise VaultError('The path already exists; read it before you replace it') from None
         except OSError:
             raise VaultError('Cannot write to this path') from None
+
+    def _check_revision(self, path: str, parent: int, name: str, expected: str) -> tuple[TextFile, int]:
+        with self._entry(parent, name) as fd:
+            note, mode = self._read_text(path, fd)
+        if note['revision'] != expected:
+            raise VaultError('The revision does not match; read the file again')
+        return note, mode
+
+    def update(self, path: str, old: str, new: str, expected_revision: str) -> FileRevision:
+        parts = self._allowed_parts(path)
+        name = parts[-1]
+        if not old:
+            raise VaultError('The old fragment must not be empty')
+        try:
+            with self._mutation_lock, self._directory(parts[:-1]) as parent:
+                note, mode = self._check_revision(path, parent, name, expected_revision)
+                content = note['content']
+                start = content.find(old)
+                if start == -1 or content.find(old, start + 1) != -1:
+                    raise VaultError('The old fragment must occur exactly once')
+                return self._store(path, parent, name, content[:start] + new + content[start + len(old):], mode)
+        except OSError:
+            raise VaultError('Cannot update this path') from None
 
     def _store(self, path: str, parent: int, name: str, content: str, mode: int | None) -> FileRevision:
         if '\0' in content:

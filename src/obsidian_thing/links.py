@@ -102,6 +102,22 @@ class Resolver:
                     break
         return sorted(set(matches))
 
+    def context(self, path: str, text: str, limit: int = 200) -> list[dict[str, object]]:
+        found: list[dict[str, object]] = []
+        for link in iter_links(text)[:limit]:
+            destinations = self.destinations(link.target, path) if link.target else [path]
+            found.append({
+                'raw': link.raw,
+                'target': link.target,
+                'anchor': link.anchor,
+                'embed': link.embed,
+                'resolved': destinations[:5],
+                'self': destinations == [path],
+                'anchor_ok': (any(self.resolves_anchor(item, link.anchor) for item in destinations)
+                              if destinations else False),
+            })
+        return found
+
     def anchors(self, path: str) -> tuple[set[str], set[str]]:
         if path not in self._anchors:
             headings: set[str] = set()

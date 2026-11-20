@@ -5,10 +5,20 @@ from dataclasses import dataclass
 from typing import Literal
 
 import yaml
+from markdown_it import MarkdownIt
+from mdit_py_plugins.dollarmath import dollarmath_plugin
+from mdit_py_plugins.front_matter import front_matter_plugin
 
 from .links import Resolver, iter_links
 
-KNOWN_CHECKS = ('quotes', 'callouts', 'broken_links', 'bases', 'canvas')
+KNOWN_CHECKS = ('default_quotes', 'inner_quoter', 'trailing_periods', 'callouts', 'broken_links', 'bases', 'canvas')
+QUOTE_CHARS = frozenset('"“”„«»')
+QUOTE_KEYS = ('default_quotes', 'inner_quoter')
+
+_MARKDOWN = (MarkdownIt('commonmark').enable('table')
+             .use(front_matter_plugin).use(dollarmath_plugin, double_inline=True))
+_SENTENCE_DOT = re.compile(r'(?<![.\d])\.$')
+_ABBREVIATION = re.compile(r'\b(?:и\s*т\.\s*[дп]|т\.\s*[ек]|см|напр)\.$', re.I)
 
 CALLOUT_TYPES = frozenset({
     'note', 'abstract', 'summary', 'tldr', 'info', 'todo', 'tip', 'hint',
@@ -41,26 +51,42 @@ def _blank_inline_code(line: str) -> str:
     return _INLINE_CODE.sub(lambda m: ' ' * len(m.group()), line)
 
 
-def _quote_findings(line: str, number: int) -> list[Finding]:
-    straight = [i for i, char in enumerate(line) if char == '"']
-    spans = list(zip(straight[0::2], straight[1::2]))
+def _quote_pair(value: object, name: str) -> tuple[str, str] | None:
+    if value is False:
+        return None
+    if not isinstance(value, str) or len(value) != 2 or set(value) - QUOTE_CHARS:
+        raise ValueError(f'Configure {name} as an opening and a closing quote character')
+    return value[0], value[1]
+
+
+QUOTE_CLOSERS = {'«': '»', '“': '”', '„': '”'}
+
+
+def _quote_findings(line: str, number: int, outer: tuple[str, str],
+                    inner: tuple[str, str] | None) -> list[Finding]:
+    if outer[0] == outer[1]:
+        positions = [i for i, char in enumerate(line) if char == outer[0]]
+        spans = list(zip(positions[0::2], positions[1::2]))
+    else:
+        opens = [i for i, char in enumerate(line) if char == outer[0]]
+        closes = [i for i, char in enumerate(line) if char == outer[1]]
+        spans = list(zip(opens, closes))
     found = []
-    open_angle = None
-    for i, char in enumerate(line):
-        if char in '“”„':
-            found.append(Finding('quotes', char, number, 'error', 'Use a plain " instead of a typographic quote'))
-        if char == '«' and open_angle is None:
-            open_angle = i
-        if char == '»' and open_angle is not None:
-            span = line[open_angle:i + 1]
-            start = open_angle
-            open_angle = None
-            if not any(a < i < b for a, b in spans):
-                found.append(Finding('quotes', span, number, 'error',
-                                     'Use plain quotes; keep them only for a nested quote'))
-    if open_angle is not None and not any(a < open_angle < b for a, b in spans):
-        found.append(Finding('quotes', line[open_angle:].strip(), number, 'error',
-                             'Use plain quotes; keep them only for a nested quote'))
+    i = 0
+    while i < len(line):
+        char = line[i]
+        if char not in QUOTE_CHARS or char in outer:
+            i += 1
+            continue
+        if inner is not None and char in inner and any(a < i < b for a, b in spans):
+            i += 1
+            continue
+        closer = QUOTE_CLOSERS.get(char)
+        end = line.find(closer, i + 1) if closer else -1
+        payload = line[i:end + 1] if end != -1 else char
+        i = end + 1 if end != -1 else i + 1
+        found.append(Finding('default_quotes', payload, number, 'error',
+                             f'Use {outer[0]} for quotes, and other marks only for a nested quote'))
     return found
 
 
@@ -182,9 +208,35 @@ def _canvas_findings(text: str) -> list[Finding]:
     return found
 
 
-def scan(path: str, text: str, options: dict[str, bool], resolver: Resolver | None) -> list[Finding]:
+def _period_findings(text: str) -> list[Finding]:
+    found = []
+    parent = None
+    for token in _MARKDOWN.parse(text):
+        if token.type != 'inline':
+            parent = token
+            continue
+        if parent is None or parent.type not in {'paragraph_open', 'td_open', 'th_open'}:
+            continue
+        if _BLOCKQUOTE_MARKER.match('> ' + token.content) or token.content.startswith('![['):
+            continue
+        visible = ''.join(
+            child.content if child.type == 'text' else ' ' if child.type in {'softbreak', 'hardbreak'}
+            else '\ufffc' if child.type in {'code_inline', 'math_inline', 'math_inline_double', 'image'}
+            else ''
+            for child in token.children or ()
+        ).rstrip()
+        if _SENTENCE_DOT.search(visible) and not _ABBREVIATION.search(visible):
+            key = ' '.join(visible.split())
+            line = (token.map or parent.map or [0])[0] + 1
+            found.append(Finding('trailing_periods', key, line, 'error', 'Omit the final period'))
+    return found
+
+
+def scan(path: str, text: str, options: dict[str, object], resolver: Resolver | None) -> list[Finding]:
     suffix = path.rsplit('.', 1)[-1].lower() if '.' in path else ''
     found: list[Finding] = []
+    outer = _quote_pair(options['default_quotes'], 'default_quotes') if 'default_quotes' in options else None
+    inner = _quote_pair(options.get('inner_quoter', False), 'inner_quoter')
     if suffix == 'base' and options.get('bases'):
         found.extend(_base_findings(text))
     if suffix == 'canvas' and options.get('canvas'):
@@ -199,23 +251,26 @@ def scan(path: str, text: str, options: dict[str, bool], resolver: Resolver | No
         if in_fence:
             continue
         line = _blank_inline_code(raw)
-        if options.get('quotes'):
-            found.extend(_quote_findings(line, number))
+        if outer is not None:
+            found.extend(_quote_findings(line, number, outer, inner))
         if options.get('callouts'):
             found.extend(_callout_findings(line, number))
+    if options.get('trailing_periods'):
+        found.extend(_period_findings(text))
     if options.get('broken_links') and resolver is not None:
         found.extend(_link_findings(text, path, resolver))
     return found
 
 
-def compare(before: str | None, after: str, path: str, options: dict[str, bool],
+def compare(before: str | None, after: str, path: str, options: dict[str, object],
             resolver: Resolver | None) -> tuple[list[str], list[str]]:
     remaining = Counter((item.code, item.payload) for item in scan(path, before or '', options, resolver))
     errors: list[str] = []
     warnings: list[str] = []
     for item in scan(path, after, options, resolver):
         key = item.code, item.payload
-        label = f'[{item.code}] {item.message}: {item.payload}'
+        label = (f'[{item.code}, line {item.line}] {item.message}' if item.code == 'trailing_periods'
+                 else f'[{item.code}] {item.message}: {item.payload}')
         if remaining[key]:
             remaining[key] -= 1
             warnings.append(f'Existing {label}')

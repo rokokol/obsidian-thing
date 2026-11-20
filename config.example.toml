@@ -5,7 +5,9 @@ token_env = "OBSIDIAN_MCP_NOTES_TOKEN"
 writable = false
 # protect_frontmatter = true
 # [vaults.notes.checks]
-# quotes = true
+# default_quotes = '""'
+# inner_quoter = "«»"
+# trailing_periods = true
 # callouts = true
 # broken_links = true
 # bases = true

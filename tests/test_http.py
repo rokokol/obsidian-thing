@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import socket
 import subprocess
@@ -47,8 +48,9 @@ def docker_endpoint(image, directory, vaults):
         for name, settings in vaults.items()
     ) + ('\n[vaults.first.checker]\nscript = "/fixtures/checker.py"\ntimeout_seconds = 1\n'
          if 'checker' in vaults['first'] else '')
-        + ('\n[vaults.first.checks]\n' + ''.join(f'{name} = true\n' for name, value in vaults['first'].get('checks', {}).items() if value)
-           if vaults['first'].get('checks') else ''))
+        + ('\n[vaults.first.checks]\n' + ''.join(
+            f'{name} = {json.dumps(value)}\n' for name, value in vaults['first'].get('checks', {}).items()
+            if value) if vaults['first'].get('checks') else ''))
     env = [arg for settings in vaults.values() for arg in ('--env', settings['token_env'])]
     container = docker(
         'run', '--detach', '--pull=never', '--read-only', '--user', f'{os.getuid()}:{os.getgid()}',
@@ -87,7 +89,9 @@ def endpoint(tmp_path, monkeypatch, request):
     if feature == 'frontmatter':
         vaults['first']['protect_frontmatter'] = True
     if feature == 'checks':
-        vaults['first']['checks'] = {'quotes': True, 'callouts': True}
+        vaults['first']['checks'] = {'default_quotes': '""', 'inner_quoter': '«»', 'callouts': True}
+    if feature == 'periods':
+        vaults['first']['checks'] = {'trailing_periods': True}
     if feature == 'links':
         vaults['first']['checks'] = {'broken_links': True}
     if feature is True:
@@ -120,9 +124,12 @@ import os
 import sys
 import time
 
+import markdown_it
+
 request = json.load(sys.stdin)
 assert request['version'] == 1
 assert 'TEST_TOKEN_FIRST' not in os.environ
+assert isinstance(request['links'], list)
 before, after = request['before'], request['after']
 path = request['path']
 if path.endswith('/timeout.md'):
@@ -136,8 +143,9 @@ if path.endswith('/invalid.md'):
 if path.endswith('/large.md'):
     print(' ' * 100_000 + '{"decision":"allow"}')
     sys.exit()
-if path == 'notes/new.md':
-    assert request['operation'] == 'write' and before is None
+if path == 'notes/linked.md':
+    assert request['links'] == [{'raw': '[[AGENTS]]', 'target': 'AGENTS', 'anchor': '', 'embed': False,
+                                 'resolved': ['AGENTS.md'], 'self': False, 'anchor_ok': True}], request['links']
 if path == 'notes/same.md' and request['operation'] == 'update':
     assert before == 'LEGACY\\r\\nold\\r\\n' and after == 'LEGACY\\r\\nновый\\r\\n'
 if after.count('LEGACY') > (before or '').count('LEGACY'):
@@ -165,6 +173,8 @@ def test_checker_warns_on_old_violations_and_rejects_new_ones(endpoint):
                 created = await session.call_tool('wiki.write', {'path': 'notes/new.md', 'content': '# New\n'})
                 assert not created.is_error
                 assert created.structured_content == {'path': 'notes/new.md', 'revision': sha256(b'# New\n').hexdigest()}
+                linked = await session.call_tool('wiki.write', {'path': 'notes/linked.md', 'content': 'См. [[AGENTS]]\n'})
+                assert not linked.is_error, linked.content
                 updated = await session.call_tool('wiki.update', {
                     'path': path, 'old': 'old', 'new': 'новый', 'expected_revision': sha256(original).hexdigest(),
                 })
@@ -284,14 +294,14 @@ def test_quote_and_callout_checks_block_only_new_mistakes(endpoint):
 
                 nearby = await write(original + '\nДописан абзац\n')
                 assert not nearby.is_error
-                assert any('Existing [quotes]' in warning for warning in nearby.structured_content['warnings'])
+                assert any('Existing [default_quotes]' in warning for warning in nearby.structured_content['warnings'])
                 assert any('callouts' in warning for warning in nearby.structured_content['warnings'])
                 revision = nearby.structured_content['revision']
                 current['revision'] = revision
 
                 for content in ('Обычный текст «в ёлочках»\n', 'Текст с „лапками“\n'):
                     rejected = await write(content, revision)
-                    assert rejected.is_error and 'quotes' in str(rejected.content)
+                    assert rejected.is_error and 'default_quotes' in str(rejected.content)
                     assert file.read_bytes() == (original + '\nДописан абзац\n').encode()
 
                 accepted = (
@@ -303,6 +313,39 @@ def test_quote_and_callout_checks_block_only_new_mistakes(endpoint):
                 )
                 allowed = await write(accepted, revision)
                 assert not allowed.is_error, allowed.content
+
+    asyncio.run(check())
+
+
+@pytest.mark.parametrize('endpoint', ['periods', None], indirect=True)
+def test_trailing_periods_are_opt_in(endpoint, request):
+    url, directory = endpoint
+    enabled = request.node.callspec.params['endpoint'] == 'periods'
+    path = 'notes/same.md'
+    file = directory / 'first' / path
+    original = 'Старый абзац.\n'
+    file.write_text(original)
+
+    async def check():
+        async with httpx.AsyncClient(headers={'Authorization': 'Bearer first'}) as http:
+            transport = streamable_http_client(f'{url}/first/mcp', http_client=http)
+            async with Client(transport, mode='2026-07-28') as session:
+                async def write(text):
+                    return await session.call_tool('wiki.write', {
+                        'path': path, 'content': text, 'expected_revision': sha256(file.read_bytes()).hexdigest(),
+                    })
+
+                for new in ('Новый абзац\nс переносом.\n', '- Новый пункт.\n', '| Колонка |\n|---|\n| **Ячейка.** |\n'):
+                    result = await write(original + '\n' + new)
+                    assert result.is_error == enabled, result.content
+                    if enabled:
+                        assert 'trailing_periods' in str(result.content)
+                        assert file.read_text() == original
+                accepted = await write(original + '\n---\n\n**Фраза.** Продолжение\n\n`код.`\n\n'
+                                       '```\nкод.\n```\n\n$$\nx.\n$$\n\n# Заголовок.\n\nОговорка и т.д.\n')
+                assert not accepted.is_error, accepted.content
+                warnings = accepted.structured_content.get('warnings', [])
+                assert len(warnings) == int(enabled)
 
     asyncio.run(check())
 

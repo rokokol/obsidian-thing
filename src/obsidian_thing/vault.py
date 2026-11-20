@@ -10,7 +10,7 @@ from uuid import uuid4
 from .checker import Checker
 from .frontmatter import FrontmatterState, frontmatter_state
 from .links import Resolver
-from .rules import KNOWN_CHECKS, compare
+from .rules import compare
 
 
 class FileRevision(TypedDict):
@@ -45,10 +45,10 @@ class Vault:
     max_read_bytes = 1_048_576
 
     def __init__(self, root: Path, allowed: list[str], *, checker: Checker | None = None,
-                 protect_frontmatter: bool = False, checks: dict[str, bool] | None = None):
+                 protect_frontmatter: bool = False, checks: dict[str, object] | None = None):
         self.checker = checker
         self.protect_frontmatter = protect_frontmatter
-        self.checks = {name: True for name in KNOWN_CHECKS} if checks is None else checks
+        self.checks = checks or {}
         self.root = root.resolve(strict=True)
         if not self.root.is_dir():
             raise ValueError('The vault root must be a directory')
@@ -266,14 +266,17 @@ class Vault:
         warnings = []
         if self.protect_frontmatter and name.lower().endswith('.md'):
             warnings.extend(self._frontmatter_warnings(before, content))
+        resolver = None
+        if self.checker or self.checks.get('broken_links'):
+            resolver = Resolver(self, {path: content})
         if any(self.checks.values()):
-            resolver = Resolver(self, {path: content}) if self.checks.get('broken_links') else None
             errors, found = compare(before, content, path, self.checks, resolver)
             if errors:
                 raise VaultError('The change breaks a vault rule: ' + '; '.join(errors[:6]))
             warnings.extend(found)
         if self.checker:
-            warnings.extend(self.checker.check(operation, path, before, content))
+            links = resolver.context(path, content) if resolver else []
+            warnings.extend(self.checker.check(operation, path, before, content, links))
         temp = f'.obsidian-thing-{uuid4().hex}'
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
         fd = os.open(temp, flags, 0o600, dir_fd=parent)

@@ -32,9 +32,13 @@ class Checker:
 
     def _run(self, payload: bytes) -> bytearray:
         deadline = monotonic() + self.timeout
+        # A Nix wrapper adds packages through site.addsitedir inside its own process, so a child
+        # interpreter inherits none of them. Pass those directories explicitly, and nothing else.
+        packages = [path for path in sys.path if path and path.endswith('site-packages')]
+        environment = {'PYTHONPATH': os.pathsep.join(packages)} if packages else {}
         with subprocess.Popen(
-            [sys.executable, '-I', '-X', 'utf8', str(self.script)], cwd=self.script.parent,
-            env={}, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            [sys.executable, '-s', '-P', '-X', 'utf8', str(self.script)], cwd=self.script.parent,
+            env=environment, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             start_new_session=True,
         ) as process, selectors.DefaultSelector() as pipes:
             try:
@@ -69,8 +73,10 @@ class Checker:
                     with suppress(ProcessLookupError):
                         os.killpg(process.pid, signal.SIGKILL)
 
-    def check(self, operation: str, path: str, before: str | None, after: str) -> list[str]:
-        payload = json.dumps(dict(version=1, operation=operation, path=path, before=before, after=after)).encode()
+    def check(self, operation: str, path: str, before: str | None, after: str,
+              links: list[dict[str, object]] | None = None) -> list[str]:
+        payload = json.dumps(dict(version=1, operation=operation, path=path, before=before, after=after,
+                                  links=links or [])).encode()
         try:
             output = self._run(payload)
         except subprocess.TimeoutExpired:

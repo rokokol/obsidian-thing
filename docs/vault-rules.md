@@ -4,7 +4,9 @@ Enable any check in a table for a writable vault. Every key is independent and o
 
 ```toml
 [vaults.notes.checks]
-quotes = true
+default_quotes = '""'
+inner_quoter = "«»"
+trailing_periods = true
 callouts = true
 broken_links = true
 bases = true
@@ -15,9 +17,15 @@ The server compares the current file with the proposed text. A finding that the 
 
 Up to 10 warnings come back by default. The reply then names how many it left out. Pass `all_warnings = true` to `wiki.write` or `wiki.update` to read every warning
 
-## quotes
+## default_quotes and inner_quoter
 
-Applies to Markdown. Plain `"` quotes are the only form in prose. Guillemets `«…»` are valid only inside a pair of plain quotes, as a nested quotation: `"outer «inner» text"`. Typographic quotes `“ ” „` are always findings
+Both options take two characters: the opening and the closing quote. `default_quotes` is the pair for prose, and `inner_quoter` is the pair allowed inside it for a nested quotation. Leave both out to skip the rule
+
+With `default_quotes = '""'` and `inner_quoter = "«»"`, plain quotes are the only form in prose and guillemets are valid only inside them: `"outer «inner» text"`. Every other mark, including `“ ” „`, is a finding. Configure `inner_quoter = false` to forbid nested quotation entirely
+
+## trailing_periods
+
+Applies to Markdown. Reject a new final period in a paragraph, list item or table cell. Keep periods inside a paragraph, ellipses and common abbreviations. The rule uses Markdown blocks, so a soft line break does not end a paragraph. The rule skips code, math blocks, headings and YAML frontmatter
 
 ## callouts
 

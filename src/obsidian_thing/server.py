@@ -16,7 +16,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from .checker import Checker, CheckerError
 from .embeddings import EmbeddingError
 from .links import Resolver, iter_links
-from .rules import KNOWN_CHECKS
+from .rules import KNOWN_CHECKS, QUOTE_KEYS, _quote_pair
 from .search import Matches, SearchIndex
 from .vault import MutationResult, TextFile, TrashedFile, Vault, VaultError
 
@@ -127,13 +127,18 @@ def _with_limit(result: MutationResult, show_all: bool) -> MutationResult:
     return result
 
 
-def _checks(settings: object, writable: bool) -> dict[str, bool]:
+def _checks(settings: object, writable: bool) -> dict[str, object]:
     if settings is None:
         return {}
     if not isinstance(settings, dict) or set(settings) - set(KNOWN_CHECKS):
         raise ValueError(f'Configure checks as a table of {", ".join(KNOWN_CHECKS)}')
-    if not all(isinstance(value, bool) for value in settings.values()):
-        raise ValueError('Configure every check as a boolean')
+    for name, value in settings.items():
+        if name in QUOTE_KEYS:
+            _quote_pair(value, name)
+        elif not isinstance(value, bool):
+            raise ValueError(f'Configure {name} as a boolean')
+    if 'inner_quoter' in settings and 'default_quotes' not in settings:
+        raise ValueError('Configure default_quotes before inner_quoter')
     if settings and not writable:
         raise ValueError('Configure checks only for a writable vault')
     return dict(settings)

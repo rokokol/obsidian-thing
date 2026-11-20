@@ -9,7 +9,7 @@
 - Move a file at a known revision to an optional private trash directory through `wiki.delete`
 - Allow trusted Python scripts to warn about or reject a proposed write before it reaches disk
 - Optionally reject writes that make valid YAML frontmatter invalid
-- Check new quotes, callout markers, broken links, bases and canvases through optional per-vault rules
+- Check new quotes, final periods, callout markers, broken links, bases and canvases through optional per-vault rules
 - Resolve every wikilink in a note with `wiki.links`
 - Limit write warnings, with `all_warnings` to read every one
 - Index Markdown and plain text for semantic search with Ollama or opt-in OpenRouter

@@ -33,7 +33,13 @@ Applies to Markdown. Inline code must not start with an equals sign: Dataview re
 
 ## heading_math and unicode_math
 
-Both apply to Markdown. `heading_math` rejects a Unicode math symbol in a heading, and `unicode_math` warns about one in prose. The rule reads only prose and headings, so code, inline code and math are not checked. A formula in TeX is always allowed
+Both apply to Markdown. `heading_math` rejects a Unicode math symbol in a heading, and `unicode_math` warns about one in prose. The rule reads only prose and headings, so code, inline code and math are not checked. A formula in TeX is allowed in prose and in a heading
+
+A wikilink keeps Unicode math and is never reported by these rules. TeX inside a link breaks the target or the caption, so `link_math` rejects it
+
+## link_math
+
+Applies to Markdown. A formula in a wikilink target, anchor or caption is a finding: `[[Note|$x^2$]]`, `[[Note#$x$]]` and `![[img.png|$x$]]`. Write the symbol as Unicode inside a link. Code and inline code are not checked
 
 ## paragraph_lines
 

@@ -12,8 +12,8 @@ from mdit_py_plugins.front_matter import front_matter_plugin
 from .links import Resolver, iter_links
 
 KNOWN_CHECKS = ('default_quotes', 'inner_quoter', 'trailing_periods', 'inline_code_equals',
-                'heading_math', 'unicode_math', 'paragraph_lines', 'callouts', 'broken_links',
-                'bases', 'canvas')
+                'heading_math', 'unicode_math', 'link_math', 'paragraph_lines', 'callouts',
+                'broken_links', 'bases', 'canvas')
 UNICODE_MATH = frozenset('≤≥≠≈∞∈∉⊂⊃⊆⊇∑∏∫∮√±×÷∂∇ℝℕℤℚℂ')
 QUOTE_CHARS = frozenset('"“”„«»')
 QUOTE_KEYS = ('default_quotes', 'inner_quoter')
@@ -39,6 +39,7 @@ _FENCE = re.compile(r'^\s*(?:>\s*)*(?:```|~~~)')
 _INLINE_CODE = re.compile(r'`[^`\n]*`')
 _BLOCKQUOTE_MARKER = re.compile(r'^(?:\s*>)+\s*\[!([^\]\s]+)\]')
 _PROSE_MARKER = re.compile(r'\[!([^\]\s]+)\]')
+_WIKILINK = re.compile(r'!?\[\[[^\]\n]*\]\]')
 
 
 @dataclass(frozen=True)
@@ -235,6 +236,16 @@ def _period_findings(text: str) -> list[Finding]:
     return found
 
 
+def _link_math_findings(text: str) -> list[Finding]:
+    found = []
+    for number, raw in enumerate(text.split('\n'), 1):
+        for link in iter_links(raw):
+            if '$' in link.raw:
+                found.append(Finding('link_math', link.raw, number, 'error',
+                                     'A formula inside a wikilink breaks its target or caption'))
+    return found
+
+
 def _markdown_findings(text: str, options: dict[str, object]) -> list[Finding]:
     found: list[Finding] = []
     parent = None
@@ -263,7 +274,7 @@ def _markdown_findings(text: str, options: dict[str, object]) -> list[Finding]:
                 continue
             if child.type in {'code_inline', 'math_inline', 'math_inline_double'}:
                 continue
-            marks = sorted({char for char in child.content if char in UNICODE_MATH})
+            marks = sorted({char for char in _WIKILINK.sub(' ', child.content) if char in UNICODE_MATH})
             for char in marks:
                 if heading and options.get('heading_math'):
                     found.append(Finding('heading_math', char, line, 'error',
@@ -301,6 +312,8 @@ def scan(path: str, text: str, options: dict[str, object], resolver: Resolver | 
         found.extend(_period_findings(text))
     if any(options.get(name) for name in ('inline_code_equals', 'heading_math', 'unicode_math', 'paragraph_lines')):
         found.extend(_markdown_findings(text, options))
+    if options.get('link_math'):
+        found.extend(_link_math_findings(text))
     if options.get('broken_links') and resolver is not None:
         found.extend(_link_findings(text, path, resolver))
     return found

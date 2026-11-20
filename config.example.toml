@@ -11,6 +11,7 @@ writable = false
 # inline_code_equals = true
 # heading_math = true
 # unicode_math = true
+# link_math = true
 # paragraph_lines = true
 # callouts = true
 # broken_links = true

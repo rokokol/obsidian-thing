@@ -9,6 +9,7 @@ OPTIONS: dict[str, object] = {
     'inline_code_equals': True,
     'heading_math': True,
     'unicode_math': True,
+    'link_math': True,
     'paragraph_lines': True,
 }
 
@@ -32,6 +33,15 @@ def test_unicode_math_is_an_error_in_a_heading_and_a_warning_in_prose():
     assert prose == [('unicode_math', '≤')]
     assert codes('## Предел $x \\le 0$\n') == []
     assert codes('Предел $x \\le 0$ в прозе\n') == []
+
+
+def test_a_link_keeps_unicode_math_and_rejects_tex():
+    assert codes('[[Файл|предел ≤ 0]]\n') == []
+    assert codes('## Предел [[Файл|≤ 0]]\n') == []
+    assert codes('[[Файл|x $x^2$]]\n') == [('link_math', '[[Файл|x $x^2$]]')]
+    assert codes('[[Файл#$x^2$]]\n') == [('link_math', '[[Файл#$x^2$]]')]
+    assert codes('![[img.png|$x$]]\n') == [('link_math', '![[img.png|$x$]]')]
+    assert codes('`[[Файл|$x$]]`\n') == []
 
 
 def test_hard_wrapped_paragraph_is_a_warning():

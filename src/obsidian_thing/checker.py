@@ -17,8 +17,15 @@ class Checker:
     max_output_bytes = 16_384
 
     def __init__(self, config: object):
-        if not isinstance(config, dict) or config.keys() - {'script', 'timeout_seconds'}:
-            raise ValueError('Configure checker as a table with script and optional timeout_seconds')
+        keys = {'script', 'timeout_seconds', 'vault_context_properties'}
+        if not isinstance(config, dict) or config.keys() - keys:
+            raise ValueError('Configure checker with script, optional timeout_seconds and vault_context_properties')
+        properties = config.get('vault_context_properties', [])
+        if (not isinstance(properties, list) or len(properties) > 32
+                or any(not isinstance(key, str) or not key.strip() or len(key) > 128
+                       for key in properties) or len(set(properties)) != len(properties)):
+            raise ValueError('Set checker.vault_context_properties to a list of distinct property names')
+        self.vault_context_properties: frozenset[str] = frozenset(properties)
         script = config.get('script')
         if not isinstance(script, str) or not Path(script).is_absolute():
             raise ValueError('Configure checker.script as an absolute path')
@@ -74,9 +81,13 @@ class Checker:
                         os.killpg(process.pid, signal.SIGKILL)
 
     def check(self, operation: str, path: str, before: str | None, after: str,
-              links: list[dict[str, object]] | None = None) -> list[str]:
-        payload = json.dumps(dict(version=1, operation=operation, path=path, before=before, after=after,
-                                  links=links or [])).encode()
+              links: list[dict[str, object]] | None = None, *,
+              vault_context: dict[str, object] | None = None) -> list[str]:
+        request: dict[str, object] = dict(version=1, operation=operation, path=path, before=before,
+                                         after=after, links=links or [])
+        if vault_context is not None:
+            request['vault_context'] = vault_context
+        payload = json.dumps(request).encode()
         try:
             output = self._run(payload)
         except subprocess.TimeoutExpired:

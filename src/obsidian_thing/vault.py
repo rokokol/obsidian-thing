@@ -8,6 +8,7 @@ from typing import NotRequired, TypedDict
 from uuid import uuid4
 
 from .checker import Checker
+from .checker_context import build_context
 from .frontmatter import FrontmatterState, frontmatter_state
 from .links import Resolver
 from .rules import compare
@@ -274,9 +275,13 @@ class Vault:
             if errors:
                 raise VaultError('The change breaks a vault rule: ' + '; '.join(errors[:6]))
             warnings.extend(found)
-        if self.checker:
-            links = resolver.context(path, content) if resolver else []
-            warnings.extend(self.checker.check(operation, path, before, content, links))
+        if self.checker and resolver is not None:
+            links = resolver.context(path, content)
+            properties = self.checker.vault_context_properties
+            context = (build_context(resolver, path, before, content, properties)
+                       if properties and name.lower().endswith('.md') else None)
+            warnings.extend(self.checker.check(operation, path, before, content, links,
+                                               vault_context=context))
         temp = f'.obsidian-thing-{uuid4().hex}'
         flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW
         fd = os.open(temp, flags, 0o600, dir_fd=parent)

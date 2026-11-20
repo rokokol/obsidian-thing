@@ -22,6 +22,7 @@ writable = false
 # [vaults.notes.checker]
 # script = "/path/to/trusted/checker.py"
 # timeout_seconds = 2
+# vault_context_properties = ["aliases", "tags", "up", "prev", "next"]
 
 # [vaults.notes.embeddings]
 # state_dir = "/path/to/private/embedding-state"

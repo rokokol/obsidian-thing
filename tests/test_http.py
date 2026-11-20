@@ -170,12 +170,12 @@ def test_checker_warns_on_old_violations_and_rejects_new_ones(endpoint):
         async with httpx.AsyncClient(headers={'Authorization': 'Bearer first'}) as http:
             transport = streamable_http_client(f'{url}/first/mcp', http_client=http)
             async with Client(transport, mode='2026-07-28') as session:
-                created = await session.call_tool('wiki.write', {'path': 'notes/new.md', 'content': '# New\n'})
+                created = await session.call_tool('obsidian.write', {'path': 'notes/new.md', 'content': '# New\n'})
                 assert not created.is_error
                 assert created.structured_content == {'path': 'notes/new.md', 'revision': sha256(b'# New\n').hexdigest()}
-                linked = await session.call_tool('wiki.write', {'path': 'notes/linked.md', 'content': 'См. [[AGENTS]]\n'})
+                linked = await session.call_tool('obsidian.write', {'path': 'notes/linked.md', 'content': 'См. [[AGENTS]]\n'})
                 assert not linked.is_error, linked.content
-                updated = await session.call_tool('wiki.update', {
+                updated = await session.call_tool('obsidian.update', {
                     'path': path, 'old': 'old', 'new': 'новый', 'expected_revision': sha256(original).hexdigest(),
                 })
                 assert not updated.is_error
@@ -184,7 +184,7 @@ def test_checker_warns_on_old_violations_and_rejects_new_ones(endpoint):
                 }
                 assert (root / path).read_bytes() == expected
                 for target, revision in ((path, sha256(expected).hexdigest()), ('notes/denied.md', None)):
-                    rejected = await session.call_tool('wiki.write', {
+                    rejected = await session.call_tool('obsidian.write', {
                         'path': target, 'content': 'LEGACY LEGACY', 'expected_revision': revision,
                     })
                     assert rejected.is_error
@@ -206,7 +206,7 @@ def test_checker_failure_blocks_writes(endpoint):
             async with Client(transport, mode='2026-07-28') as session:
                 for case in ('timeout', 'crash', 'invalid', 'large'):
                     path = f'notes/{case}.md'
-                    result = await session.call_tool('wiki.write', {'path': path, 'content': 'should not be saved'})
+                    result = await session.call_tool('obsidian.write', {'path': path, 'content': 'should not be saved'})
                     assert result.is_error, case
                     assert 'checker' in str(result.content).lower()
                     assert 'private diagnostic' not in str(result.content)
@@ -230,12 +230,12 @@ def test_frontmatter_guard_compares_complete_markdown_versions(endpoint):
             transport = streamable_http_client(f'{url}/first/mcp', http_client=http)
             async with Client(transport, mode='2026-07-28') as session:
                 async def write(content, expected_revision: str | None = revision, target=path):
-                    return await session.call_tool('wiki.write', {
+                    return await session.call_tool('obsidian.write', {
                         'path': target, 'content': content, 'expected_revision': expected_revision,
                     })
 
                 async def update(old, new, rev=revision):
-                    return await session.call_tool('wiki.update', {
+                    return await session.call_tool('obsidian.update', {
                         'path': path, 'old': old, 'new': new, 'expected_revision': rev,
                     })
 
@@ -287,7 +287,7 @@ def test_quote_and_callout_checks_block_only_new_mistakes(endpoint):
             transport = streamable_http_client(f'{url}/first/mcp', http_client=http)
             async with Client(transport, mode='2026-07-28') as session:
                 async def write(content, rev=None, target=path):
-                    return await session.call_tool('wiki.write', {
+                    return await session.call_tool('obsidian.write', {
                         'path': target, 'content': content,
                         'expected_revision': current['revision'] if rev is None else rev,
                     })
@@ -331,7 +331,7 @@ def test_trailing_periods_are_opt_in(endpoint, request):
             transport = streamable_http_client(f'{url}/first/mcp', http_client=http)
             async with Client(transport, mode='2026-07-28') as session:
                 async def write(text):
-                    return await session.call_tool('wiki.write', {
+                    return await session.call_tool('obsidian.write', {
                         'path': path, 'content': text, 'expected_revision': sha256(file.read_bytes()).hexdigest(),
                     })
 
@@ -365,7 +365,7 @@ def test_broken_links_block_new_ones_and_warning_limit(endpoint):
             transport = streamable_http_client(f'{url}/first/mcp', http_client=http)
             async with Client(transport, mode='2026-07-28') as session:
                 async def write(content):
-                    return await session.call_tool('wiki.write', {
+                    return await session.call_tool('obsidian.write', {
                         'path': path, 'content': content, 'expected_revision': current['revision'],
                     })
 
@@ -382,21 +382,21 @@ def test_broken_links_block_new_ones_and_warning_limit(endpoint):
                 assert good.is_error and 'attachment' in str(good.content)
                 assert file.read_text() == original + '\nДописано\n'
 
-                found = await session.call_tool('wiki.links', {'path': path})
+                found = await session.call_tool('obsidian.links', {'path': path})
                 resolved = {item['target']: item['resolved'] for item in found.structured_content['links']}
                 assert resolved == {'same': [path], 'старая': []}
 
                 many = '\n'.join(f'[[missing-{index}]]' for index in range(12))
                 (root / 'notes' / 'many.md').write_text(many + '\n')
                 revision = sha256((many + '\n').encode()).hexdigest()
-                capped = await session.call_tool('wiki.write', {
+                capped = await session.call_tool('obsidian.write', {
                     'path': 'notes/many.md', 'content': many + '\nДописано\n', 'expected_revision': revision,
                 })
                 assert not capped.is_error
                 warnings = capped.structured_content['warnings']
                 assert len(warnings) == 11
                 assert warnings[-1].startswith('2 more warnings')
-                everything = await session.call_tool('wiki.update', {
+                everything = await session.call_tool('obsidian.update', {
                     'path': 'notes/many.md', 'old': 'Дописано', 'new': 'Дописано дважды',
                     'expected_revision': capped.structured_content['revision'], 'all_warnings': True,
                 })
@@ -425,22 +425,22 @@ def test_tools_read_live_files_in_the_selected_vault(endpoint, mode, version):
                 async with Client(transport, mode=mode) as session:
                     assert session.protocol_version == version
                     tools = await session.list_tools()
-                    expected = {'wiki.allowed', 'wiki.agentsmd', 'wiki.read', 'wiki.links'}
+                    expected = {'obsidian.allowed', 'obsidian.agentsmd', 'obsidian.read', 'obsidian.links'}
                     if name == 'first':
-                        expected.update(('wiki.write', 'wiki.update', 'wiki.delete'))
+                        expected.update(('obsidian.write', 'obsidian.update', 'obsidian.delete'))
                     assert {tool.name for tool in tools.tools} == expected
-                    allowed = await session.call_tool('wiki.allowed')
+                    allowed = await session.call_tool('obsidian.allowed')
                     assert set(allowed.structured_content['paths']) == {'notes', 'AGENTS.md'}
-                    note = await session.call_tool('wiki.read', {'path': 'notes/same.md'})
+                    note = await session.call_tool('obsidian.read', {'path': 'notes/same.md'})
                     assert note.structured_content['content'] == name
                     assert note.structured_content['revision'] == sha256(name.encode()).hexdigest()
                     (directory / name / 'notes' / 'same.md').write_text(f'{name} changed')
-                    recent = await session.call_tool('wiki.read', {'path': 'notes/same.md'})
+                    recent = await session.call_tool('obsidian.read', {'path': 'notes/same.md'})
                     assert recent.structured_content['content'] == f'{name} changed'
-                    rules = await session.call_tool('wiki.agentsmd')
+                    rules = await session.call_tool('obsidian.agentsmd')
                     assert rules.structured_content['content'] == f'Rules for {name}'
                     for path in ('private.txt', 'notes-backup/file.md', 'notes/../private.txt', 'notes/link.md'):
-                        denied = await session.call_tool('wiki.read', {'path': path})
+                        denied = await session.call_tool('obsidian.read', {'path': path})
                         assert denied.is_error
 
     asyncio.run(check())
@@ -454,7 +454,7 @@ def test_write_requires_current_revision_and_respects_scope(endpoint):
             transport = streamable_http_client(f'{url}/first/mcp', http_client=http)
             async with Client(transport, mode='2026-07-28') as session:
                 async def write(path, content, **kwargs):
-                    return await session.call_tool('wiki.write', {'path': path, 'content': content, **kwargs})
+                    return await session.call_tool('obsidian.write', {'path': path, 'content': content, **kwargs})
 
                 path = 'notes/new.md'
                 created = await write(path, 'Новая заметка\n')
@@ -494,7 +494,7 @@ def test_update_replaces_only_a_unique_fragment_at_the_current_revision(endpoint
             transport = streamable_http_client(f'{url}/first/mcp', http_client=http)
             async with Client(transport, mode='2026-07-28') as session:
                 async def update(old, new, rev=revision):
-                    return await session.call_tool('wiki.update', {
+                    return await session.call_tool('obsidian.update', {
                         'path': path, 'old': old, 'new': new, 'expected_revision': rev,
                     })
 
@@ -523,7 +523,7 @@ def test_delete_moves_current_text_to_trash(endpoint):
             transport = streamable_http_client(f'{url}/first/mcp', http_client=http)
             async with Client(transport, mode='2026-07-28') as session:
                 async def delete(target, rev):
-                    return await session.call_tool('wiki.delete', {'path': target, 'expected_revision': rev})
+                    return await session.call_tool('obsidian.delete', {'path': target, 'expected_revision': rev})
 
                 assert (await delete(path, '0' * 64)).is_error
                 assert (await delete('notes/link.md', sha256(b'private').hexdigest())).is_error

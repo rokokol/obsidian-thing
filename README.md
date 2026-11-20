@@ -14,13 +14,13 @@ uv run --locked obsidian-thing --config config.toml
 
 Use the listen address printed by the server and the endpoint `/vaults/<vault_id>/mcp`. Send `Authorization: Bearer <token>` with each request. For remote access, put the server behind HTTPS and set `allowed_hosts` in the TOML file to the host names that the proxy forwards
 
-Vaults allow reads by default. Set `writable = true` for a vault to enable `wiki.write` and `wiki.update` for any client with its token. Search is optional. See [TODO.md](TODO.md) for the remaining work
+Vaults allow reads by default. Set `writable = true` for a vault to enable `obsidian.write` and `obsidian.update` for any client with its token. Search is optional. See [TODO.md](TODO.md) for the remaining work
 
-`wiki.write` creates a UTF-8 file in an existing directory when you omit `expected_revision`. To replace a file, pass the revision from `wiki.read`. Run one server process per writable vault. Revision checks do not protect against concurrent edits outside that process or unsaved Obsidian edits
+`obsidian.write` creates a UTF-8 file in an existing directory when you omit `expected_revision`. To replace a file, pass the revision from `obsidian.read`. Run one server process per writable vault. Revision checks do not protect against concurrent edits outside that process or unsaved Obsidian edits
 
-`wiki.update` replaces a non-empty `old` fragment with `new` at the revision given by `expected_revision`. The fragment must occur exactly once, including overlapping matches
+`obsidian.update` replaces a non-empty `old` fragment with `new` at the revision given by `expected_revision`. The fragment must occur exactly once, including overlapping matches
 
-Enable `wiki.delete` with `trash_dir` in a writable vault. Use an existing private directory outside all vaults, owned by the server user. The trash and the file must share a mount. If the move fails, the file stays in the vault. The tool does not remove paths named directly in `allowed`, because the server needs them at startup
+Enable `obsidian.delete` with `trash_dir` in a writable vault. Use an existing private directory outside all vaults, owned by the server user. The trash and the file must share a mount. If the move fails, the file stays in the vault. The tool does not remove paths named directly in `allowed`, because the server needs them at startup
 
 To restore a deletion, read `$trash_dir/<trash_id>/path` for the original vault-relative path. Move the sibling `file` back without overwriting an existing file. The server does not purge the trash
 
@@ -58,7 +58,7 @@ docker run --rm --read-only --user "$(id -u):$(id -g)" \
 
 Enable embeddings per vault with the settings in [`config.example.toml`](config.example.toml). Create a private state directory outside the vault and mount it writable in Docker. Use a separate directory for each vault
 
-Call `wiki.index` to index one Markdown or plain-text file. Use `wiki.query` for a text query or `wiki.related` for neighbors of a note. `wiki.related` indexes the source if needed, but searches only indexed files. The server skips deleted and outdated results. There is no background indexer yet
+Call `obsidian.index` to index one Markdown or plain-text file. Use `obsidian.query` for a text query or `obsidian.related` for neighbors of a note. `obsidian.related` indexes the source if needed, but searches only indexed files. The server skips deleted and outdated results. There is no background indexer yet
 
 Ollama requires a loopback endpoint in the server's network namespace. OpenRouter sends text to a cloud provider only when you set `allow_cloud = true` and specify `include_paths`. The vault token then permits indexing within those paths and sending text queries. The request selects one route and requires zero data retention, denies data collection, and disables fallback
 

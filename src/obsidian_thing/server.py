@@ -49,21 +49,21 @@ def vault_server(
 ) -> MCPServer:
     server = MCPServer(name)
 
-    @server.tool(name='wiki.allowed', description='List allowed paths relative to this vault.')
+    @server.tool(name='obsidian.allowed', description='List allowed paths relative to this vault.')
     def allowed() -> dict[str, list[str]]:
         return {'paths': vault.allowed}
 
-    @server.tool(name='wiki.agentsmd', description='Read this vault’s instructions before your first edit.')
+    @server.tool(name='obsidian.agentsmd', description='Read this vault’s instructions before your first edit.')
     def agentsmd() -> TextFile:
         with _tool_errors():
             return vault.read('AGENTS.md')
 
-    @server.tool(name='wiki.read', description='Read a UTF-8 file at a vault-relative path and return its revision.')
+    @server.tool(name='obsidian.read', description='Read a UTF-8 text file at a vault-relative path and return its revision.')
     def read(path: str) -> TextFile:
         with _tool_errors():
             return vault.read(path)
 
-    @server.tool(name='wiki.links', description='Resolve every wikilink in a note against this vault.')
+    @server.tool(name='obsidian.links', description='Resolve every wikilink of a Markdown note against this vault.')
     def links(path: str) -> dict[str, list[dict[str, object]]]:
         with _tool_errors():
             note = vault.read(path)
@@ -75,18 +75,18 @@ def vault_server(
             ]}
 
     if writable:
-        @server.tool(name='wiki.write', description=(
-            'Call wiki.agentsmd before your first edit. Create a UTF-8 file if expected_revision '
-            'is absent or null. To replace a file, pass its current revision from wiki.read.'
+        @server.tool(name='obsidian.write', description=(
+            'Call obsidian.agentsmd before your first edit. Create a UTF-8 file if expected_revision '
+            'is absent or null. To replace a file, pass its current revision from obsidian.read.'
         ))
         def write(path: str, content: str, expected_revision: str | None = None,
                   all_warnings: bool = False) -> MutationResult:
             with _tool_errors():
                 return _with_limit(vault.write(path, content, expected_revision), all_warnings)
 
-        @server.tool(name='wiki.update', description=(
-            'Call wiki.agentsmd before your first edit. Replace one exact match for old with new. '
-            'Pass the current revision from wiki.read.'
+        @server.tool(name='obsidian.update', description=(
+            'Call obsidian.agentsmd before your first edit. Replace one exact match for old with new. '
+            'Pass the current revision from obsidian.read.'
         ))
         def update(path: str, old: str, new: str, expected_revision: str,
                    all_warnings: bool = False) -> MutationResult:
@@ -94,26 +94,35 @@ def vault_server(
                 return _with_limit(vault.update(path, old, new, expected_revision), all_warnings)
 
     if writable and trash_dir is not None:
-        @server.tool(name='wiki.delete', description=(
-            'Call wiki.agentsmd before your first edit. Move a UTF-8 file to the configured trash. '
-            'Pass the current revision from wiki.read.'
+        @server.tool(name='obsidian.delete', description=(
+            'Call obsidian.agentsmd before your first edit. Move a UTF-8 file to the configured trash. '
+            'Pass the current revision from obsidian.read.'
         ))
         def delete(path: str, expected_revision: str) -> TrashedFile:
             with _tool_errors():
                 return vault.delete(path, expected_revision, trash_dir)
 
     if search is not None:
-        @server.tool(name='wiki.index', description='Index one Markdown or text file. May call the configured embedding provider.')
+        @server.tool(name='obsidian.index', description=(
+            'Index one Markdown (.md) or plain text (.txt) file inside the embedding scope. '
+            'Attachments, PDF and audio files are not indexed yet. May call the configured provider.'
+        ))
         def index(path: str) -> dict[str, str | int]:
             with _tool_errors():
                 return search.index(path)
 
-        @server.tool(name='wiki.query', description='Search indexed files by semantic similarity to a text query.')
+        @server.tool(name='obsidian.query', description=(
+            'Search indexed Markdown (.md) and plain text (.txt) files by semantic similarity. '
+            'Only files that were indexed inside the embedding scope are searched.'
+        ))
         def query(text: str, limit: int = 10) -> Matches:
             with _tool_errors():
                 return search.query(text, limit)
 
-        @server.tool(name='wiki.related', description='Find indexed neighbors of a file. Index its current revision if needed.')
+        @server.tool(name='obsidian.related', description=(
+            'Find indexed Markdown or plain text neighbors of a Markdown or plain text file. '
+            'Index its current revision if needed.'
+        ))
         def related(path: str, limit: int = 10, min_score: float = 0.0) -> Matches:
             with _tool_errors():
                 return search.related(path, limit, min_score)

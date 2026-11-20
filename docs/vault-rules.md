@@ -15,7 +15,7 @@ canvas = true
 
 The server compares the current file with the proposed text. A finding that the current version already has returns a warning, so an old mistake never blocks an edit. A new finding follows the rule's own level: rules report errors for facts that break a file and warnings for advice
 
-Up to 10 warnings come back by default. The reply then names how many it left out. Pass `all_warnings = true` to `wiki.write` or `wiki.update` to read every warning
+Up to 10 warnings come back by default. The reply then names how many it left out. Pass `all_warnings = true` to `obsidian.write` or `obsidian.update` to read every warning
 
 ## default_quotes and inner_quoter
 
@@ -37,7 +37,7 @@ Known types: `note`, `abstract`, `summary`, `tldr`, `info`, `todo`, `tip`, `hint
 
 Applies to Markdown. Each wikilink and embed must resolve inside the vault and inside the allowed paths. Resolution follows Obsidian: a name without a dot also matches a Markdown note, and a folder in the link narrows the match. A heading or block anchor must exist in the target note
 
-Use `wiki.links` to see the resolution of every link in a note before a write
+Use `obsidian.links` to see the resolution of every link in a note before a write
 
 ## bases
 

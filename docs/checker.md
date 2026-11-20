@@ -12,11 +12,11 @@ The script receives one UTF-8 JSON object on stdin. `operation` is `write` or `u
 
 Exit with status zero and write one UTF-8 JSON response to stdout. Use `{"decision":"allow"}` to accept the change. Add `"warnings": ["message"]` to include warnings in the successful MCP reply. Use `{"decision":"reject","message":"reason"}` to block the write and show the reason to the client. Use nonempty, printable strings and do not include private note text in messages
 
-A timeout, nonzero exit, invalid response or stdout larger than 16 KiB blocks the write. The server discards stderr. The checker cannot return replacement text or change the result of `wiki.delete`. This check applies only to writes through MCP
+A timeout, nonzero exit, invalid response or stdout larger than 16 KiB blocks the write. The server discards stderr. The checker cannot return replacement text or change the result of `obsidian.delete`. This check applies only to writes through MCP
 
 ## Protect YAML frontmatter
 
-Set `protect_frontmatter = true` in a writable vault to check Markdown files before `wiki.write` and `wiki.update`. This option is off by default and does not require a checker script
+Set `protect_frontmatter = true` in a writable vault to check Markdown files before `obsidian.write` and `obsidian.update`. This option is off by default and does not require a checker script
 
 A frontmatter block starts at the top of the file and uses `---` delimiter lines. Its YAML must be empty or a map of properties without duplicate keys. The guard rejects a change from valid to invalid frontmatter. It warns if a write removes valid frontmatter or leaves or introduces invalid frontmatter where there was no valid block before
 

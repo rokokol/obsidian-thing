@@ -72,6 +72,6 @@ def test_search_tools_use_the_authenticated_vault(tmp_path, monkeypatch):
             return response.json()['result']['structuredContent']
 
         assert client.post(url, json={}).status_code == 401
-        assert call('wiki.index', {'path': 'note.md'})['chunks'] == 1
-        assert call('wiki.query', {'text': 'related text'}) == {'matches': [{'path': 'note.md', 'score': 1.0}]}
-        assert call('wiki.related', {'path': 'note.md'}) == {'matches': []}
+        assert call('obsidian.index', {'path': 'note.md'})['chunks'] == 1
+        assert call('obsidian.query', {'text': 'related text'}) == {'matches': [{'path': 'note.md', 'score': 1.0}]}
+        assert call('obsidian.related', {'path': 'note.md'}) == {'matches': []}

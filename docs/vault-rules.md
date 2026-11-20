@@ -27,6 +27,18 @@ With `default_quotes = '""'` and `inner_quoter = "«»"`, plain quotes are the o
 
 Applies to Markdown. Reject a new final period in a paragraph, list item or table cell. Keep periods inside a paragraph, ellipses and common abbreviations. The rule uses Markdown blocks, so a soft line break does not end a paragraph. The rule skips code, math blocks, headings and YAML frontmatter
 
+## inline_code_equals
+
+Applies to Markdown. Inline code must not start with an equals sign: Dataview reads such a span as its own query. A new finding rejects the write. Fenced code and math are not checked
+
+## heading_math and unicode_math
+
+Both apply to Markdown. `heading_math` rejects a Unicode math symbol in a heading, and `unicode_math` warns about one in prose. The rule reads only prose and headings, so code, inline code and math are not checked. A formula in TeX is always allowed
+
+## paragraph_lines
+
+Applies to Markdown. A paragraph or a list item that spans several lines returns a warning, because the vault keeps one paragraph on one line. An intentional line break inside a paragraph, such as a poem, gives the same warning
+
 ## callouts
 
 Applies to Markdown. A callout marker `[!type]` in a blockquote must name a known type. Folded markers `[!type]-` and `[!type]+` are checked the same way. A marker outside a blockquote renders as text

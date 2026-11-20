@@ -22,6 +22,10 @@ A frontmatter block starts at the top of the file and uses `---` delimiter lines
 
 The guard does not require a header or particular properties. It does not enforce property types, preserve individual values or reformat the file
 
+## Example
+
+[examples/checker.py](../examples/checker.py) is a working checker. It warns about a one-line block formula and about underscore emphasis. Copy it, replace the rules, and point `checker.script` at your copy
+
 ## Example policy
 
 This example rejects new occurrences of a placeholder line and warns when earlier occurrences remain:

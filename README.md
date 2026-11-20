@@ -27,7 +27,8 @@ To restore a deletion, read `$trash_dir/<trash_id>/path` for the original vault-
 ## Documentation
 
 - [Python write checker](docs/checker.md): configure a script to warn about or reject proposed edits
-- [Markdown rules for writes](docs/vault-rules.md): check quotes and callout markers before a write
+- [Markdown rules for writes](docs/vault-rules.md): check quotes, periods, links and callout markers before a write
+- [Example checker](examples/checker.py): a starting point for vault-specific rules
 
 ## Run with Nix or Docker
 

@@ -11,7 +11,10 @@ from mdit_py_plugins.front_matter import front_matter_plugin
 
 from .links import Resolver, iter_links
 
-KNOWN_CHECKS = ('default_quotes', 'inner_quoter', 'trailing_periods', 'callouts', 'broken_links', 'bases', 'canvas')
+KNOWN_CHECKS = ('default_quotes', 'inner_quoter', 'trailing_periods', 'inline_code_equals',
+                'heading_math', 'unicode_math', 'paragraph_lines', 'callouts', 'broken_links',
+                'bases', 'canvas')
+UNICODE_MATH = frozenset('≤≥≠≈∞∈∉⊂⊃⊆⊇∑∏∫∮√±×÷∂∇ℝℕℤℚℂ')
 QUOTE_CHARS = frozenset('"“”„«»')
 QUOTE_KEYS = ('default_quotes', 'inner_quoter')
 
@@ -232,6 +235,45 @@ def _period_findings(text: str) -> list[Finding]:
     return found
 
 
+def _markdown_findings(text: str, options: dict[str, object]) -> list[Finding]:
+    found: list[Finding] = []
+    parent = None
+    paragraph: str | None = None
+    for token in _MARKDOWN.parse(text):
+        if token.type in {'paragraph_open', 'heading_open', 'td_open', 'th_open'}:
+            parent = token
+            paragraph = None
+            if token.type == 'paragraph_open' and token.map and token.map[1] - token.map[0] > 1:
+                paragraph = str(token.map[0] + 1)
+            continue
+        if token.type != 'inline' or parent is None:
+            continue
+        line = (token.map or parent.map or [0])[0] + 1
+        if paragraph and options.get('paragraph_lines'):
+            payload = ' '.join(token.content.split())[:60]
+            found.append(Finding('paragraph_lines', payload, int(paragraph), 'warning',
+                                 'Keep one paragraph on one line'))
+            paragraph = None
+        heading = parent.type == 'heading_open'
+        for child in token.children or ():
+            if child.type == 'code_inline' and options.get('inline_code_equals'):
+                if child.content.lstrip().startswith('='):
+                    found.append(Finding('inline_code_equals', child.content, line, 'error',
+                                         'Inline code must not start with an equals sign'))
+                continue
+            if child.type in {'code_inline', 'math_inline', 'math_inline_double'}:
+                continue
+            marks = sorted({char for char in child.content if char in UNICODE_MATH})
+            for char in marks:
+                if heading and options.get('heading_math'):
+                    found.append(Finding('heading_math', char, line, 'error',
+                                         'Write a heading formula in TeX'))
+                elif not heading and options.get('unicode_math'):
+                    found.append(Finding('unicode_math', char, line, 'warning',
+                                         'Prefer TeX for a math symbol'))
+    return found
+
+
 def scan(path: str, text: str, options: dict[str, object], resolver: Resolver | None) -> list[Finding]:
     suffix = path.rsplit('.', 1)[-1].lower() if '.' in path else ''
     found: list[Finding] = []
@@ -257,6 +299,8 @@ def scan(path: str, text: str, options: dict[str, object], resolver: Resolver | 
             found.extend(_callout_findings(line, number))
     if options.get('trailing_periods'):
         found.extend(_period_findings(text))
+    if any(options.get(name) for name in ('inline_code_equals', 'heading_math', 'unicode_math', 'paragraph_lines')):
+        found.extend(_markdown_findings(text, options))
     if options.get('broken_links') and resolver is not None:
         found.extend(_link_findings(text, path, resolver))
     return found

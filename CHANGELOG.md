@@ -14,6 +14,7 @@
 - Allow trusted Python scripts to warn about or reject a proposed write before it reaches disk
 - Optionally reject writes that make valid YAML frontmatter invalid
 - Check new quotes, final periods, callout markers, inline code, heading formulas, link formulas, hard-wrapped paragraphs, broken links, bases and canvases through optional per-vault rules
+- Reject new inline tags in Markdown with the optional `prevent_inline_tags` rule
 - Resolve every wikilink in a note with `obsidian.links`
 - Limit write warnings, with `all_warnings` to read every one
 - Give custom write checkers optional access to selected vault properties and their link targets

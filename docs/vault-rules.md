@@ -7,6 +7,7 @@ Enable any check in a table for a writable vault. Every key is independent and o
 default_quotes = '""'
 inner_quoter = "«»"
 trailing_periods = true
+prevent_inline_tags = true
 callouts = true
 broken_links = true
 bases = true
@@ -44,6 +45,12 @@ Applies to Markdown. A formula in a wikilink target, anchor or caption is a find
 ## paragraph_lines
 
 Applies to Markdown. A paragraph or a list item that spans several lines returns a warning, because the vault keeps one paragraph on one line. An intentional line break inside a paragraph, such as a poem, gives the same warning
+
+## prevent_inline_tags
+
+Applies to Markdown. Reject a new tag in the text, such as `#abcd` or `#inbox/to-read`. Put tags in the YAML `tags` property. Write a literal hash as `\#abcd` or use inline code
+
+The rule skips code, formulas, link targets and labels, and YAML frontmatter. It does not change the note. An existing tag returns a warning if the edit leaves it in place
 
 ## callouts
 

@@ -94,6 +94,8 @@ def endpoint(tmp_path, monkeypatch, request):
         vaults['first']['checks'] = {'trailing_periods': True}
     if feature == 'links':
         vaults['first']['checks'] = {'broken_links': True}
+    if feature == 'inline-tags':
+        vaults['first']['checks'] = {'prevent_inline_tags': True}
     if feature is True:
         script = tmp_path / 'checker.py'
         script.write_text(CHECKER_SCRIPT)
@@ -346,6 +348,38 @@ def test_trailing_periods_are_opt_in(endpoint, request):
                 assert not accepted.is_error, accepted.content
                 warnings = accepted.structured_content.get('warnings', [])
                 assert len(warnings) == int(enabled)
+
+    asyncio.run(check())
+
+
+@pytest.mark.parametrize('endpoint', ['inline-tags', None], indirect=True)
+def test_prevent_inline_tags_is_opt_in(endpoint, request):
+    url, directory = endpoint
+    enabled = request.node.callspec.params['endpoint'] == 'inline-tags'
+    path = 'notes/same.md'
+    file = directory / 'first' / path
+    original = 'Old #existing\n'
+    file.write_text(original)
+
+    async def check():
+        async with httpx.AsyncClient(headers={'Authorization': 'Bearer first'}) as http:
+            transport = streamable_http_client(f'{url}/first/mcp', http_client=http)
+            async with Client(transport, mode='2026-07-28') as session:
+                written = await session.call_tool('obsidian.write', {
+                    'path': path, 'content': original + 'Literal: `#abcd`\n',
+                    'expected_revision': sha256(original.encode()).hexdigest(),
+                })
+                assert not written.is_error, written.content
+                warnings = written.structured_content.get('warnings', [])
+                assert len(warnings) == int(enabled)
+                result = await session.call_tool('obsidian.update', {
+                    'path': path, 'old': '`#abcd`', 'new': '#abcd',
+                    'expected_revision': written.structured_content['revision'],
+                })
+                assert result.is_error == enabled, result.content
+                if enabled:
+                    assert 'prevent_inline_tags' in str(result.content) and '#abcd' in str(result.content)
+                assert file.read_text() == original + ('Literal: `#abcd`\n' if enabled else 'Literal: #abcd\n')
 
     asyncio.run(check())
 

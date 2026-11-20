@@ -8,6 +8,7 @@ writable = false
 # default_quotes = '""'
 # inner_quoter = "«»"
 # trailing_periods = true
+# prevent_inline_tags = true
 # inline_code_equals = true
 # heading_math = true
 # unicode_math = true

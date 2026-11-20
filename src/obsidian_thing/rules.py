@@ -3,9 +3,11 @@ import re
 from collections import Counter
 from dataclasses import dataclass
 from typing import Literal
+from unicodedata import category
 
 import yaml
 from markdown_it import MarkdownIt
+from markdown_it.rules_inline import StateInline
 from mdit_py_plugins.dollarmath import dollarmath_plugin
 from mdit_py_plugins.front_matter import front_matter_plugin
 
@@ -13,13 +15,17 @@ from .links import Resolver, iter_links
 
 KNOWN_CHECKS = ('default_quotes', 'inner_quoter', 'trailing_periods', 'inline_code_equals',
                 'heading_math', 'unicode_math', 'link_math', 'paragraph_lines', 'callouts',
-                'broken_links', 'bases', 'canvas')
+                'prevent_inline_tags', 'broken_links', 'bases', 'canvas')
 UNICODE_MATH = frozenset('≤≥≠≈∞∈∉⊂⊃⊆⊇∑∏∫∮√±×÷∂∇ℝℕℤℚℂ')
 QUOTE_CHARS = frozenset('"“”„«»')
 QUOTE_KEYS = ('default_quotes', 'inner_quoter')
 
-_MARKDOWN = (MarkdownIt('commonmark').enable('table')
-             .use(front_matter_plugin).use(dollarmath_plugin, double_inline=True))
+def _markdown_parser() -> MarkdownIt:
+    return (MarkdownIt('commonmark').enable('table')
+            .use(front_matter_plugin).use(dollarmath_plugin, double_inline=True))
+
+
+_MARKDOWN = _markdown_parser()
 _SENTENCE_DOT = re.compile(r'(?<![.\d])\.$')
 _ABBREVIATION = re.compile(r'\b(?:и\s*т\.\s*[дп]|т\.\s*[ек]|см|напр)\.$', re.I)
 
@@ -49,6 +55,60 @@ class Finding:
     line: int
     level: Literal['error', 'warning']
     message: str
+
+
+def _tag_character(char: str) -> bool:
+    return (char.isalnum() or char in '_-/'
+            or not char.isascii() and category(char) in {'So', 'Sk', 'Mn', 'Mc'})
+
+
+def _tag_inline(state: StateInline, silent: bool) -> bool:
+    source, start, limit = state.src, state.pos, state.posMax
+    tag = ''
+    if source.startswith(('[[', '![['), start):
+        link = _WIKILINK.match(source, start, limit)
+        if link is None:
+            return False
+        end = link.end()
+    elif source.startswith('%%', start):
+        close = source.find('%%', start + 2, limit)
+        if close < 0:
+            return False
+        end = close + 2
+    elif source[start] == '#' and not state.linkLevel:
+        if start and (source[start - 1].isalnum() or source[start - 1] in '-/_#?=&%'):
+            return False
+        end = start + 1
+        while end < limit and _tag_character(source[end]):
+            end += 1
+        name = source[start + 1:end].rstrip('/')
+        if not name or all(char.isdecimal() for char in name):
+            return False
+        tag = '#' + name
+    else:
+        return False
+    if not silent:
+        token = state.push('obsidian_tag' if tag else 'obsidian_literal', '', 0)
+        token.content = tag
+    state.pos = end
+    return True
+
+
+_TAG_MARKDOWN = _markdown_parser()
+_TAG_MARKDOWN.inline.ruler.before('text', 'obsidian_tag', _tag_inline)
+
+
+def _tag_findings(text: str) -> list[Finding]:
+    found = []
+    for block in _TAG_MARKDOWN.parse(text.removeprefix('\ufeff')):
+        if block.type != 'inline':
+            continue
+        line = (block.map or [0])[0] + 1
+        for token in block.children or ():
+            if token.type == 'obsidian_tag':
+                found.append(Finding('prevent_inline_tags', token.content, line, 'error',
+                                     'Put tags in YAML or escape a literal hash or use inline code'))
+    return found
 
 
 def _blank_inline_code(line: str) -> str:
@@ -314,6 +374,8 @@ def scan(path: str, text: str, options: dict[str, object], resolver: Resolver | 
         found.extend(_markdown_findings(text, options))
     if options.get('link_math'):
         found.extend(_link_math_findings(text))
+    if options.get('prevent_inline_tags'):
+        found.extend(_tag_findings(text))
     if options.get('broken_links') and resolver is not None:
         found.extend(_link_findings(text, path, resolver))
     return found

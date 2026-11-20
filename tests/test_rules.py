@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pytest
 
 from obsidian_thing.rules import compare, scan
@@ -71,6 +69,52 @@ def test_options_are_independent():
 
 def test_other_extensions_are_untouched():
     assert scan('note.txt', '## Раздел x ≤ 0\n`= b`\n', OPTIONS, None) == []
+
+
+@pytest.mark.parametrize(('text', 'tag'), [
+    ('Hash: #abcd\n', '#abcd'),
+    ('#планы/на_год\n', '#планы/на_год'),
+    ('> [!note] #tag\n', '#tag'),
+    ('- **#first**\n', '#first'),
+    ('| Topic |\n| --- |\n| #inbox/to-read |\n', '#inbox/to-read'),
+    ('Issue #123bug (not #123)\n', '#123bug'),
+    ('Color (#abc)\n', '#abc'),
+    ('Mood #🌱\n', '#🌱'),
+    (r'An even number of escapes: \\#abcd', '#abcd'),
+])
+def test_prevent_inline_tags_reports_new_tags(text, tag):
+    options: dict[str, object] = {'prevent_inline_tags': True}
+    found = scan('note.md', text, options, None)
+    assert [(item.payload, item.level) for item in found] == [(tag, 'error')]
+    assert scan('note.md', text, {}, None) == []
+    assert scan('sample.txt', text, options, None) == []
+
+
+@pytest.mark.parametrize('text', [
+    r'An escaped hash: \#abcd',
+    'A code span: `` #abcd ``',
+    '~~~md\n#abcd\n~~~',
+    '    #abcd',
+    '---\ntitle: "#abcd"\ntags: [math]\n---\n# Heading',
+    '# Heading\n\nPart #123\n',
+    'A formula: $x + #abcd$',
+    '$$\n#abcd\n$$',
+    'A wikilink: [[Note #abcd|Title #other]]',
+    'An embed: ![[Picture #abcd.png]]',
+    'A Markdown link: [Label #abcd](<file.md#section>)',
+    'A URL: <https://example.org/#abcd> and https://example.org/path?ref=#abcd',
+    'An entity: &#35;abcd',
+    'An inline comment %% #abcd %% followed by text',
+])
+def test_prevent_inline_tags_ignores_other_uses_of_hash(text):
+    assert not scan('note.md', text, {'prevent_inline_tags': True}, None)
+
+
+def test_prevent_inline_tags_warns_about_an_old_occurrence():
+    options: dict[str, object] = {'prevent_inline_tags': True}
+    errors, warnings = compare('Old #old\n', 'Edited #old and new #old\n', 'note.md', options, None)
+    assert len(warnings) == 1 and 'Existing' in warnings[0]
+    assert len(errors) == 1 and '#old' in errors[0]
 
 
 @pytest.mark.parametrize('text', ['Готово\n', '## Заголовок\n\nАбзац\n'])

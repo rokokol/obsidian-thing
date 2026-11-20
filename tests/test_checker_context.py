@@ -32,6 +32,7 @@ def test_checker_snapshot_uses_selected_properties_and_scoped_paths(tmp_path):
     (root / 'Open' / 'Alias.md').symlink_to(root / 'Closed' / 'Parent.md')
     checker = make_checker(tmp_path, '''
 s = c['vault_context']
+assert s['property_names'] == ['aliases', 'next', 'up']
 assert set(s['files']) == {'Open/Previous.md', 'Open/Parent.md', 'Open/asset.pdf',
                            'Open/Bad.md', 'Open/Current.md'}
 assert set(s['notes']) == {'Open/Previous.md', 'Open/Parent.md', 'Open/Bad.md'}

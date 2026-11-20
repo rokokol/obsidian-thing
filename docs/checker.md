@@ -20,6 +20,7 @@ Set `checker.vault_context_properties = ["aliases", "tags", "up", "prev", "next"
 
 | Key | Value |
 | --- | --- |
+| `property_names` | Names selected in the config, even when no note has those properties |
 | `files` | Paths of all allowed files, including attachments and the proposed file |
 | `notes` | Map from allowed Markdown paths to metadata, without the file under edit |
 | `before`, `after` | Metadata for the current and proposed versions. For a new file, `before` is null |
@@ -28,6 +29,8 @@ Set `checker.vault_context_properties = ["aliases", "tags", "up", "prev", "next"
 Each metadata entry has `frontmatter`, `properties` and `property_links`. Frontmatter status is `absent`, `valid`, `invalid` or `unreadable`. An unreadable note has no property data; treat it as unknown, not empty
 
 `properties` contains only the keys in the config. Scalar values are strings, flat lists are arrays of strings, and other shapes are null. `property_links` maps property names to lists of wikilinks. Each link has `raw`, `target`, `anchor` and up to five `resolved` paths
+
+If a rule needs vault context, reject the write when `vault_context` is absent or `property_names` lacks a required name. Check the selection rather than the property values in a note
 
 The server reads only files in the current vault allowlist. It sends no bodies from other notes and does not collect inline tags. For each write, it builds a new snapshot from disk before it starts the script. This is not an atomic snapshot of edits from other applications
 

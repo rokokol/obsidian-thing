@@ -54,6 +54,7 @@ def build_context(resolver: Resolver, path: str, before: str | None, after: str,
     previous = Resolver(resolver.vault, {path: before}) if before is not None else None
     notes: dict[str, object] = {}
     context: dict[str, object] = {
+        'property_names': sorted(properties),
         'files': files,
         'notes': notes,
         'before': _note(resolver, path, before, properties) if before is not None else None,

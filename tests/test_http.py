@@ -45,6 +45,11 @@ def docker_endpoint(image, directory, vaults):
         f'allowed = ["notes", "AGENTS.md"]\ntoken_env = "{settings["token_env"]}"\n'
         + ('writable = true\ntrash_dir = "/fixtures/trash"\n' if settings.get('writable') else '')
         + ('protect_frontmatter = true\n' if settings.get('protect_frontmatter') else '')
+        + (f'read_obsidian = {json.dumps(settings["read_obsidian"])}\n' if 'read_obsidian' in settings else '')
+        + ''.join(f'\n[vaults.{name}.{table}]\n' + ''.join(
+            f'{key} = {json.dumps("/fixtures/state" if key == "state_dir" else value)}\n'
+            for key, value in settings[table].items())
+            for table in ('integrations', 'indexing', 'embeddings') if table in settings)
         for name, settings in vaults.items()
     ) + ('\n[vaults.first.checker]\nscript = "/fixtures/checker.py"\ntimeout_seconds = 1\n'
          if 'checker' in vaults['first'] else '')
@@ -86,6 +91,12 @@ def endpoint(tmp_path, monkeypatch, request):
     trash.mkdir(mode=0o700)
     vaults['first'].update(writable=True, trash_dir=str(trash))
     feature = getattr(request, 'param', None)
+    if feature == 'auto-index':
+        state = tmp_path / 'state'
+        state.mkdir(mode=0o700)
+        vaults['first']['indexing'] = {'auto': True, 'scan_seconds': 10}
+        vaults['first']['embeddings'] = {'provider': 'ollama', 'url': 'http://127.0.0.1:1',
+                                         'model': 'synthetic', 'dimensions': 2, 'state_dir': str(state)}
     if feature == 'integrations':
         vaults['first']['integrations'] = {'canvas': False, 'bases': False, 'iconic_offline': True}
         vaults['second']['read_obsidian'] = False
@@ -601,6 +612,38 @@ def test_update_replaces_only_a_unique_fragment_at_the_current_revision(endpoint
                 assert result.structured_content == {'path': path, 'revision': sha256(expected).hexdigest()}
                 assert (await update('новый', 'stale')).is_error
                 assert file.read_bytes() == expected
+
+    asyncio.run(check())
+
+
+@pytest.mark.parametrize('endpoint', ['auto-index'], indirect=True)
+def test_auto_index_updates_mcp_writes_without_a_provider(endpoint):
+    url, directory = endpoint
+    path = 'notes/auto.md'
+
+    async def check():
+        async with httpx.AsyncClient(headers={'Authorization': 'Bearer first'}) as http:
+            transport = streamable_http_client(f'{url}/first/mcp', http_client=http)
+            async with Client(transport, mode='2026-07-28') as session:
+                async def expect(term):
+                    async with asyncio.timeout(20):
+                        while True:
+                            query = await session.call_tool('obsidian.query', {'text': term})
+                            assert not query.is_error, query.content
+                            assert query.structured_content['vector_unavailable'] is True
+                            if [hit['path'] for hit in query.structured_content['matches']] == [path]:
+                                return
+                            await asyncio.sleep(0.05)
+
+                written = await session.call_tool('obsidian.write', {'path': path, 'content': 'originaltoken'})
+                assert not written.is_error, written.content
+                await expect('originaltoken')
+                replacement = directory / 'first' / 'notes' / '.replacement'
+                replacement.write_text('replacementtoken')
+                replacement.replace(directory / 'first' / path)
+                await expect('replacementtoken')
+                old = await session.call_tool('obsidian.query', {'text': 'originaltoken'})
+                assert old.structured_content['matches'] == []
 
     asyncio.run(check())
 

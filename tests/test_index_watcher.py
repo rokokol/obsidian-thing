@@ -1,3 +1,5 @@
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 from threading import Event
@@ -24,6 +26,23 @@ def test_local_watcher_indexes_without_embedding_requests(tmp_path: Path, monkey
     state = tmp_path / 'state'
     state.mkdir(mode=0o700)
     (root / 'old.md').write_text('firsttoken')
+    git_executable = shutil.which('git')
+    if git_executable is None:
+        pytest.skip('This scenario requires git')
+
+    def git(*args):
+        subprocess.run([git_executable, '-C', str(root), '-c', 'user.name=Fixture',
+                        '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false', *args],
+                       check=True, capture_output=True, timeout=10)
+
+    git('init', '-b', 'main')
+    git('add', '.')
+    git('commit', '-m', 'Base')
+    git('switch', '-c', 'topic')
+    (root / 'branch.md').write_text('branchtoken')
+    git('add', '.')
+    git('commit', '-m', 'Add note')
+    git('switch', 'main')
     monkeypatch.setenv('TEST_WATCH_TOKEN', 'synthetic-token')
     operations = []
 
@@ -45,6 +64,14 @@ def test_local_watcher_indexes_without_embedding_requests(tmp_path: Path, monkey
             return [hit['path'] for hit in response.json()['result']['structuredContent']['matches']]
 
         _until(lambda: search('firsttoken') == ['old.md'])
+        git('checkout', 'topic')
+        _until(lambda: search('branchtoken') == ['branch.md'])
+        git('checkout', 'main')
+        _until(lambda: not search('branchtoken'))
+        git('merge', '--ff-only', 'topic')
+        _until(lambda: search('branchtoken') == ['branch.md'])
+        git('reset', '--keep', 'HEAD^')
+        _until(lambda: not search('branchtoken'))
         (root / '.editor.tmp').write_text('secondtoken')
         (root / '.editor.tmp').replace(root / 'old.md')
         _until(lambda: search('secondtoken') == ['old.md'])

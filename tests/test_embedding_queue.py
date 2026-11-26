@@ -1,3 +1,4 @@
+import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import Event
@@ -54,6 +55,47 @@ def test_queue_survives_restart_and_only_sends_current_uncached_fragments(tmp_pa
     assert calls == [('final', 'background')]
     assert index.pending() == []
     assert [hit['path'] for hit in index.query('final', 10)['matches']] == ['moved.md']
+
+
+def test_bulk_directory_move_reuses_vectors_and_updates_paths(tmp_path: Path, monkeypatch):
+    root = tmp_path / 'vault'
+    root.mkdir()
+    state = tmp_path / 'state'
+    state.mkdir(mode=0o700)
+    (root / 'Anchor.md').write_text('Destination')
+    count = 512
+    paths = [f'Old/Group-{i // 64}/Set-{i // 16}/Note-{i}.md' for i in range(count)]
+    for i, path in enumerate(paths):
+        note = root / path
+        note.parent.mkdir(parents=True, exist_ok=True)
+        note.write_text(f'# Notes\n\nword{i} [[Anchor]] [[Note-{(i + 1) % count}]]\n')
+    calls = []
+
+    def embed(self, text, operation):
+        calls.append(operation)
+        return [1.0, 0.0]
+
+    monkeypatch.setattr(Embedder, 'embed', embed)
+    vault = Vault(root, ['.'])
+    index = SearchIndex(vault, dict(provider='ollama', model='synthetic', dimensions=2), state)
+    index.reconcile_local()
+    assert index.run_pending()
+    assert calls.count('background') == count + 1
+    calls.clear()
+
+    (root / 'Old').rename(root / 'New')
+    index.reconcile_local()
+    moved = {path.replace('Old/', 'New/', 1) for path in paths}
+    assert {path for path, _ in index.pending()} == moved
+    assert index.run_pending() and not index.pending()
+    assert calls == []
+    with sqlite3.connect(index.database) as db:
+        for table in ('local_files', 'lexical_chunks', 'embedded_files', 'section_chunks'):
+            assert {path for path, in db.execute(f'SELECT DISTINCT path FROM {table}')} == moved | {'Anchor.md'}
+    assert {link['source'] for link in vault.graph.incoming('Anchor.md')['links']} == moved
+    sample = paths[0].replace('Old/', 'New/', 1)
+    assert [link['resolved'] for link in vault.graph.outgoing(sample)] == [['Anchor.md'], [paths[1].replace('Old/', 'New/', 1)]]
+    assert index.query('word0', 1)['matches'][0]['path'] == sample
 
 
 def test_queue_retains_failed_work_and_manual_index_drains_it(tmp_path: Path, monkeypatch):

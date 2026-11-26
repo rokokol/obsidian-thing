@@ -1,3 +1,4 @@
+import fcntl
 import json
 import math
 import re
@@ -67,6 +68,8 @@ class SearchIndex:
             raise ValueError('Configure include_paths before you send files to OpenRouter')
         self.embedder = Embedder(config, state)
         self.database = state / 'search.sqlite3'
+        self.embedding_lock_path = state / 'embedding.lock'
+        self.run_lock_path = state / 'embedding-run.lock'
         self.index_lock = Lock()
         self.local_lock = Lock()
         with closing(sqlite3.connect(self.database)) as db, db:
@@ -83,6 +86,10 @@ class SearchIndex:
                 CREATE TABLE IF NOT EXISTS local_files (
                     mode INTEGER NOT NULL, path TEXT NOT NULL, revision TEXT NOT NULL,
                     PRIMARY KEY (mode, path)
+                );
+                CREATE TABLE IF NOT EXISTS embedded_files (
+                    profile TEXT NOT NULL, mode INTEGER NOT NULL, path TEXT NOT NULL, revision TEXT NOT NULL,
+                    PRIMARY KEY (profile, mode, path)
                 );
                 CREATE TABLE IF NOT EXISTS lexical_chunks (
                     id INTEGER PRIMARY KEY, mode INTEGER NOT NULL, path TEXT NOT NULL,
@@ -119,18 +126,24 @@ class SearchIndex:
         if any(parts[:len(prefix)] == prefix for prefix in self.exclude):
             raise VaultError('The path is excluded from embeddings')
 
-    def index(self, path: str, *, operation: str = 'index') -> dict[str, str | int]:
+    def index(self, path: str, *, operation: str = 'index', queued_revision: str | None = None,
+              stop: Callable[[], bool] | None = None) -> dict[str, str | int]:
         self._check_path(path)
         profile = self.embedder.profile
-        with self.index_lock, closing(sqlite3.connect(self.database)) as db:
+        with self.index_lock, self.embedding_lock_path.open('ab') as lease, closing(sqlite3.connect(self.database)) as db:
+            fcntl.flock(lease, fcntl.LOCK_EX)
             note = self.vault.read(path)
             revision = note['revision']
+            if queued_revision is not None and revision != queued_revision:
+                raise VaultError('The queued revision is no longer current')
             fragments = self._fragments(note)
             with self.local_lock:
                 self._index_lexical(db, path, revision, fragments)
             digests = [sha256(chunk.text.encode()).hexdigest() for chunk in fragments]
             hashes = {digest: chunk.text for digest, chunk in zip(digests, fragments, strict=True)}
             for digest, chunk in hashes.items():
+                if stop is not None and stop():
+                    raise VaultError('Background indexing stopped')
                 if not db.execute('SELECT 1 FROM vectors WHERE profile = ? AND hash = ?',
                                   (profile, digest)).fetchone():
                     if not self._is_current(path, revision):
@@ -149,7 +162,37 @@ class SearchIndex:
                      json.dumps(chunk.headings), chunk.line_start, chunk.line_end)
                     for ordinal, (digest, chunk) in enumerate(zip(digests, fragments, strict=True))
                 ))
+                db.execute('INSERT OR REPLACE INTO embedded_files VALUES (?, ?, ?, ?)',
+                           (profile, self.section_chunks, path, revision))
         return {'path': path, 'revision': revision, 'chunks': len(fragments)}
+
+    def pending(self) -> list[tuple[str, str]]:
+        with closing(sqlite3.connect(self.database)) as db:
+            rows = db.execute('''
+                SELECT l.path, l.revision FROM local_files AS l
+                WHERE l.mode = ? AND NOT EXISTS (
+                    SELECT 1 FROM embedded_files AS e WHERE e.profile = ? AND e.mode = l.mode
+                    AND e.path = l.path AND e.revision = l.revision
+                ) ORDER BY l.path
+            ''', (self.section_chunks, self.embedder.profile)).fetchall()
+        return [(path, revision) for path, revision in rows if self._is_current(path, revision)]
+
+    def run_pending(self, *, stop: Callable[[], bool] | None = None) -> bool:
+        with self.run_lock_path.open('ab') as lease:
+            try:
+                fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                return False
+            for path, revision in self.pending():
+                if stop is not None and stop():
+                    return False
+                try:
+                    self.index(path, operation='background', queued_revision=revision, stop=stop)
+                except VaultError:
+                    continue
+                except EmbeddingError:
+                    return False
+            return True
 
     def _fragments(self, note: TextFile) -> list[Chunk]:
         fragments = list(islice(chunks(note['content'], self.chunk_size,
@@ -200,6 +243,7 @@ class SearchIndex:
     def _drop_path(db: sqlite3.Connection, path: str) -> None:
         with db:
             db.execute('DELETE FROM local_files WHERE path = ?', (path,))
+            db.execute('DELETE FROM embedded_files WHERE path = ?', (path,))
             db.execute('DELETE FROM lexical_chunks WHERE path = ?', (path,))
             db.execute('DELETE FROM section_chunks WHERE path = ?', (path,))
 
@@ -222,6 +266,7 @@ class SearchIndex:
                   for chunk in fragments))
             db.execute('INSERT OR REPLACE INTO local_files VALUES (?, ?, ?)', (*key, revision))
             db.execute('DELETE FROM section_chunks WHERE path = ? AND revision != ?', (path, revision))
+            db.execute('DELETE FROM embedded_files WHERE path = ? AND revision != ?', (path, revision))
 
     def _validate_limit(self, limit: int) -> None:
         if not 1 <= limit <= self.max_results:

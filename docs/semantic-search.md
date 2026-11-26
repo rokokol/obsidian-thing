@@ -22,7 +22,13 @@ These rules apply to explicit `obsidian.index` and `obsidian.related` calls, as 
 
 Set `indexing.auto = true` for a vault with a configured `embeddings` table. The server scans the vault at startup and at intervals set by `indexing.scan_seconds`. The default interval is 300 seconds, with a small random variation. These updates refresh FTS5 and the link cache without a call to the model
 
-On Linux, file events trigger checks for specific paths. A directory change, lost events, or a replaced vault root triggers a full scan. Other systems and failed file watches use periodic scans. These updates do not fill the vector index. `obsidian.index` and `obsidian.related` can still request vectors
+On Linux, file events trigger checks for specific paths. A directory change, lost events, or a replaced vault root triggers a full scan. Other systems and failed file watches use periodic scans. Local updates do not call the model. `obsidian.index` and `obsidian.related` can still request vectors immediately
+
+## Scheduled embedding updates
+
+Set `embeddings.background = true` to allow scheduled requests to the model. Set `embeddings.schedule` to a five-field cron expression in UTC. The default is `0 3 * * *`. A missed run waits until the next scheduled time
+
+Each scheduled run checks the vault before it processes the queue. SQLite records the latest local revision and the completed vector revision. A difference marks pending work. The server skips deleted, outdated, and excluded files. It reuses cached vectors for unchanged model inputs. Provider errors leave unfinished work for the next run
 
 ## Full-text and hybrid search
 

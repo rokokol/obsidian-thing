@@ -15,6 +15,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.concurrency import run_in_threadpool
 
 from .checker import Checker, CheckerError
+from .embedding_schedule import EmbeddingSchedule
 from .embeddings import EmbeddingError
 from .fsrs import (Change as FsrsChange, DictionaryList, DictionaryPage, History, edit_dictionary,
                    history, list_dictionaries, read_dictionary)
@@ -266,6 +267,7 @@ def create_app(config: dict) -> Starlette:
     routes = []
     servers = []
     watchers: list[IndexWatcher] = []
+    schedules: list[EmbeddingSchedule] = []
     roots = []
     trash_dirs = set()
     state_dirs: list[Path] = []
@@ -345,8 +347,12 @@ def create_app(config: dict) -> Starlette:
 
     for name, token, vault, writable, trash_dir, embeddings, state, integrations, policy in mounted:
         search = SearchIndex(vault, embeddings, state, indexing=policy) if state is not None else None
-        if search is not None and policy.auto:
-            watchers.append(IndexWatcher(search))
+        if search is not None:
+            if policy.auto:
+                watchers.append(IndexWatcher(search))
+            schedule = EmbeddingSchedule(search, embeddings)
+            if schedule.enabled:
+                schedules.append(schedule)
         server = vault_server(name, vault, writable=writable, trash_dir=trash_dir, search=search,
                               iconic_offline=integrations['iconic_offline'], fsrs_dictionary=integrations['fsrs_dictionary'])
         app = server.streamable_http_app(stateless_http=True, json_response=True, transport_security=security)
@@ -361,6 +367,9 @@ def create_app(config: dict) -> Starlette:
             for watcher in watchers:
                 watcher.start()
                 stack.push_async_callback(run_in_threadpool, watcher.stop)
+            for schedule in schedules:
+                schedule.start()
+                stack.push_async_callback(run_in_threadpool, schedule.stop)
             yield
 
     return Starlette(routes=routes, lifespan=lifespan)

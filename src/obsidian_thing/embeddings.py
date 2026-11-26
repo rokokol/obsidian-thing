@@ -118,7 +118,7 @@ class Embedder:
         result = {}
         status = 'error'
         try:
-            with self.http.open(req, timeout=30) as response:
+            with self.http.open(req, timeout=5 if operation == 'background' else 30) as response:
                 raw = response.read(2_000_001)
             if len(raw) > 2_000_000:
                 raise ValueError('Response exceeds the limit')

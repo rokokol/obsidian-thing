@@ -1,0 +1,50 @@
+name: Publish container
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-container-${{ github.ref }}
+
+jobs:
+  verify:
+    uses: ./.github/workflows/build.yml
+    with:
+      ref: ${{ github.sha }}
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check release tag
+        run: |
+          version=$(<VERSION)
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          [[ "$GITHUB_REF_NAME" == "v$version" ]]
+      - uses: cachix/install-nix-action@v31
+      - name: Build release image
+        run: |
+          image=$(nix build .#docker --no-link --print-out-paths --print-build-logs)
+          docker load --input "$image"
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push version to GHCR
+        run: |
+          target="ghcr.io/${GITHUB_REPOSITORY,,}:$(<VERSION)"
+          docker tag obsidian-thing:local "$target"
+          docker push "$target"

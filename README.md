@@ -1,5 +1,7 @@
 # Obsidian Thing
 
+[![CI](https://github.com/rokokol/obsidian-thing/actions/workflows/build.yml/badge.svg)](https://github.com/rokokol/obsidian-thing/actions/workflows/build.yml) [![GHCR](https://img.shields.io/badge/container-GHCR-555)](https://github.com/rokokol/obsidian-thing/pkgs/container/obsidian-thing)
+
 Obsidian Thing serves Obsidian vaults over MCP Streamable HTTP. Each vault has its own endpoint and bearer token. The server can read text files and vault instructions without a running Obsidian app
 
 ## Run locally

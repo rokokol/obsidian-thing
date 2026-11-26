@@ -64,6 +64,17 @@
         }
       );
 
+      devShells = forAllSystems (pkgs: {
+        default = pkgs.mkShell {
+          packages = [
+            pkgs.actionlint
+            pkgs.pyright
+            pkgs.python3
+            pkgs.uv
+          ];
+        };
+      });
+
       formatter = forAllSystems (pkgs: pkgs.nixfmt-tree);
     };
 }

@@ -277,8 +277,8 @@ def create_app(config: dict) -> Starlette:
         if not re.fullmatch(r'[a-zA-Z0-9_-]+', name):
             raise ValueError('A vault ID must use ASCII letters, digits, underscores, or hyphens')
         env = settings['token_env']
-        token = os.environ.get(env, '')
-        if not re.fullmatch(r'[a-zA-Z0-9._~+/=-]+', token):
+        bearer = os.environ.get(env, '')
+        if not re.fullmatch(r'[a-zA-Z0-9._~+/=-]+', bearer):
             raise ValueError(f'Set a valid bearer token in {env}')
         allowed = settings['allowed']
         if not isinstance(allowed, list) or not all(isinstance(path, str) for path in allowed):
@@ -334,7 +334,7 @@ def create_app(config: dict) -> Starlette:
             state_dirs.append(state)
         if policy.auto and state is None:
             raise ValueError('Automatic indexing needs an embeddings state directory')
-        mounted.append((name, token, vault, writable, trash_dir, embeddings, state, integrations, policy))
+        mounted.append((name, bearer, vault, writable, trash_dir, embeddings, state, integrations, policy))
 
     if any(_overlap(trash, root) for trash in trash_dirs for root in roots):
         raise ValueError('The trash and vault directories must not overlap')

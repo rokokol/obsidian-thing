@@ -87,8 +87,8 @@ def _tag_inline(state: StateInline, silent: bool) -> bool:
     else:
         return False
     if not silent:
-        token = state.push('obsidian_tag' if tag else 'obsidian_literal', '', 0)
-        token.content = tag
+        node = state.push('obsidian_tag' if tag else 'obsidian_literal', '', 0)
+        node.content = tag
     state.pos = end
     return True
 

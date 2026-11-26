@@ -74,10 +74,10 @@ def _wiki_inline(state: StateInline, silent: bool) -> bool:
     if match is None:
         return False
     if not silent:
-        token = state.push('wiki_link', '', 0)
+        node = state.push('wiki_link', '', 0)
         edge = wiki_link(match)
         if edge is not None:
-            token.meta['edge'] = replace(edge, offset=state.pos)
+            node.meta['edge'] = replace(edge, offset=state.pos)
     state.pos = match.end()
     return True
 

@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.workflow }}-${{ inputs.ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - name: Check vendored files and repository policy
+        run: |
+          ./vendor-sync.sh check
+          ./check-pins.sh
+          ./scripts/no-secrets.sh
+      - uses: cachix/install-nix-action@v31
+      - name: Check workflows and Nix format
+        run: |
+          nix develop --command actionlint
+          nix fmt -- --ci
+      - name: Test and check Python
+        run: |
+          nix develop --command uv sync --locked --no-python-downloads
+          nix develop --command uv run --no-sync pytest -q
+          nix develop --command pyright --pythonpath .venv/bin/python src/obsidian_thing tests
+      - name: Build the native package and Docker image
+        run: |
+          nix build .#default --no-link --print-build-logs
+          image=$(nix build .#docker --no-link --print-out-paths --print-build-logs)
+          docker load --input "$image"
+      - name: Test MCP in Docker
+        env:
+          OBSIDIAN_MCP_TEST_IMAGE: obsidian-thing:local
+        run: nix develop --command uv run --no-sync pytest -q tests/test_http.py

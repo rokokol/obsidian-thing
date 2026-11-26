@@ -1,0 +1,70 @@
+name: Update dependencies
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency: update-dependencies
+
+jobs:
+  bump:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    outputs:
+      branch: ${{ steps.bump.outputs.branch }}
+      revision: ${{ steps.bump.outputs.revision }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: cachix/install-nix-action@v31
+      - name: Update lock files
+        id: bump
+        run: |
+          nix develop --command uv lock --upgrade
+          nix flake update
+          if git diff --quiet -- flake.lock uv.lock; then
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          branch="bump/dependencies-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          git switch -c "$branch"
+          git add -- flake.lock uv.lock
+          git commit -m 'Update dependency locks'
+          git push origin "HEAD:refs/heads/$branch"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "revision=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  verify:
+    needs: bump
+    if: needs.bump.outputs.revision != ''
+    uses: ./.github/workflows/build.yml
+    with:
+      ref: ${{ needs.bump.outputs.revision }}
+
+  land:
+    needs: [bump, verify]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.bump.outputs.revision }}
+          fetch-depth: 0
+      - name: Land the verified commit
+        env:
+          BRANCH: ${{ needs.bump.outputs.branch }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          git push origin "HEAD:refs/heads/$DEFAULT_BRANCH"
+          git push origin --delete "$BRANCH"

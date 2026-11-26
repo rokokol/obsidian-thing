@@ -15,10 +15,14 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 from .checker import Checker, CheckerError
 from .embeddings import EmbeddingError
-from .links import Resolver, iter_links
+from .fsrs import (Change as FsrsChange, DictionaryList, DictionaryPage, History, edit_dictionary,
+                   history, list_dictionaries, read_dictionary)
+from .graph import Attachment, Backlinks, Edge
+from .iconic import IconChanges, IconResult, set_icon
 from .rules import KNOWN_CHECKS, QUOTE_KEYS, _quote_pair
 from .search import Matches, SearchIndex
-from .vault import MutationResult, TextFile, TrashedFile, Vault, VaultError
+from .structured_documents import BaseChange, CanvasChange
+from .vault import FileInfo, MutationResult, RenamedFile, TextFile, TrashedFile, Vault, VaultError
 
 
 @contextmanager
@@ -45,7 +49,7 @@ class RequireBearer:
 
 def vault_server(
     name: str, vault: Vault, *, writable: bool = False, trash_dir: Path | None = None,
-    search: SearchIndex | None = None,
+    search: SearchIndex | None = None, iconic_offline: bool = False, fsrs_dictionary: bool = False,
 ) -> MCPServer:
     server = MCPServer(name)
 
@@ -63,16 +67,27 @@ def vault_server(
         with _tool_errors():
             return vault.read(path)
 
-    @server.tool(name='obsidian.links', description='Resolve every wikilink of a Markdown note against this vault.')
-    def links(path: str) -> dict[str, list[dict[str, object]]]:
+    @server.tool(name='obsidian.stat', description='Read the size and revision of a vault file without returning its bytes.')
+    def stat(path: str) -> FileInfo:
         with _tool_errors():
-            note = vault.read(path)
-            resolver = Resolver(vault, {path: note['content']})
-            return {'links': [
-                {'raw': link.raw, 'target': link.target, 'anchor': link.anchor,
-                 'embed': link.embed, 'resolved': resolver.destinations(link.target, path)}
-                for link in iter_links(note['content'])
-            ]}
+            return vault.stat(path)
+
+    graph = vault.graph
+
+    @server.tool(name='obsidian.links_out', description='List links from a Markdown note, Canvas or Base and show how each link resolves.')
+    def links_out(path: str) -> dict[str, list[Edge]]:
+        with _tool_errors():
+            return {'links': graph.outgoing(path)}
+
+    @server.tool(name='obsidian.links_in', description='List visible Markdown notes, canvases and bases with links to this vault file.')
+    def links_in(path: str) -> Backlinks:
+        with _tool_errors():
+            return graph.incoming(path)
+
+    @server.tool(name='obsidian.media', description='List local attachments linked from Markdown, Canvas or Bases. Return metadata, not bytes.')
+    def media(path: str) -> dict[str, list[Attachment]]:
+        with _tool_errors():
+            return {'media': graph.media(path)}
 
     if writable:
         @server.tool(name='obsidian.write', description=(
@@ -93,10 +108,71 @@ def vault_server(
             with _tool_errors():
                 return _with_limit(vault.update(path, old, new, expected_revision), all_warnings)
 
+    if writable and vault.canvas:
+        @server.tool(name='obsidian.canvas_edit', description=(
+            'Call obsidian.agentsmd before your first edit. Apply a batch of node and edge edits to a Canvas. '
+            'Pass its current revision from obsidian.read.'
+        ))
+        def canvas_edit(path: str, expected_revision: str, changes: list[CanvasChange],
+                        all_warnings: bool = False) -> MutationResult:
+            with _tool_errors():
+                return _with_limit(vault.canvas_edit(path, expected_revision, changes), all_warnings)
+
+    if writable and vault.bases:
+        @server.tool(name='obsidian.base_edit', description=(
+            'Call obsidian.agentsmd before your first edit. Edit filters, formulas or views in a Base. '
+            'Pass its current revision from obsidian.read. The server does not evaluate formulas.'
+        ))
+        def base_edit(path: str, expected_revision: str, changes: list[BaseChange],
+                      all_warnings: bool = False) -> MutationResult:
+            with _tool_errors():
+                return _with_limit(vault.base_edit(path, expected_revision, changes), all_warnings)
+
+    if fsrs_dictionary:
+        @server.tool(name='obsidian.fsrs_list', description='List accessible FSRS Vocabulary dictionaries.')
+        def fsrs_list(after: str = '', limit: int = 50) -> DictionaryList:
+            with _tool_errors():
+                return list_dictionaries(vault, after, limit)
+
+        @server.tool(name='obsidian.fsrs_read', description='Read dictionary entries and their FSRS state. Row numbers start at zero.')
+        def fsrs_read(path: str, offset: int = 0, limit: int = 50) -> DictionaryPage:
+            with _tool_errors():
+                return read_dictionary(vault, path, offset, limit)
+
+        @server.tool(name='obsidian.fsrs_history', description='Read recorded review grades for cards in one dictionary.')
+        def fsrs_history(path: str, card_id: str | None = None, offset: int = 0, limit: int = 200) -> History:
+            with _tool_errors():
+                return history(vault, path, card_id, offset, limit)
+
+        if writable:
+            @server.tool(name='obsidian.fsrs_edit', description=(
+                'Call obsidian.agentsmd before your first edit. Create, update or delete dictionary rows in order. '
+                'Use the revision from obsidian.fsrs_read. Do not pass schedule columns.'
+            ))
+            def fsrs_edit(path: str, expected_revision: str, changes: list[FsrsChange],
+                          all_warnings: bool = False) -> MutationResult:
+                with _tool_errors():
+                    return _with_limit(edit_dictionary(vault, path, expected_revision, changes), all_warnings)
+
+    if writable and iconic_offline:
+        @server.tool(name='obsidian.iconic_set', description='Set or clear the icon or color of an existing file. Call obsidian.agentsmd before your first edit.')
+        def iconic_set(path: str, changes: IconChanges) -> IconResult:
+            with _tool_errors():
+                return set_icon(vault, path, changes)
+
+    if writable:
+        @server.tool(name='obsidian.rename', description=(
+            'Call obsidian.agentsmd before your first edit. Rename a file in its directory and update visible links. '
+            'Pass the current revision from obsidian.read or obsidian.stat.'
+        ))
+        def rename(path: str, new_name: str, expected_revision: str) -> RenamedFile:
+            with _tool_errors():
+                return vault.rename(path, new_name, expected_revision)
+
     if writable and trash_dir is not None:
         @server.tool(name='obsidian.delete', description=(
-            'Call obsidian.agentsmd before your first edit. Move a UTF-8 file to the configured trash. '
-            'Pass the current revision from obsidian.read.'
+            'Call obsidian.agentsmd before your first edit. Move an unreferenced file to the configured trash. '
+            'Pass the current revision from obsidian.read or obsidian.stat.'
         ))
         def delete(path: str, expected_revision: str) -> TrashedFile:
             with _tool_errors():
@@ -213,8 +289,22 @@ def create_app(config: dict) -> Starlette:
         if not isinstance(protect_frontmatter, bool) or (protect_frontmatter and not writable):
             raise ValueError('Configure protect_frontmatter as a boolean for a writable vault')
         checks = _checks(settings.get('checks'), writable)
+        read_obsidian = settings.get('read_obsidian', True)
+        if not isinstance(read_obsidian, bool):
+            raise ValueError('Configure read_obsidian as a boolean')
+        integrations = settings.get('integrations', {})
+        defaults = dict(canvas=True, bases=True, media_gallery=False, iconic_offline=False, fsrs_dictionary=False)
+        if (not isinstance(integrations, dict) or set(integrations) - defaults.keys() or
+                not all(isinstance(value, bool) for value in integrations.values())):
+            raise ValueError('Configure integrations as a table of supported boolean switches')
+        integrations = defaults | integrations
+        if integrations['iconic_offline'] and not (read_obsidian and writable):
+            raise ValueError('Iconic needs read_obsidian and a writable vault')
+        if integrations['fsrs_dictionary'] and not read_obsidian:
+            raise ValueError('FSRS Vocabulary needs read_obsidian for settings and review history')
         vault = Vault(Path(settings['root']), allowed, checker=checker, protect_frontmatter=protect_frontmatter,
-                      checks=checks)
+                      checks=checks, read_obsidian=read_obsidian, canvas=integrations['canvas'],
+                      bases=integrations['bases'], media_gallery=integrations['media_gallery'])
         roots.append(vault.root)
         trash_dir = None
         if 'trash_dir' in settings:
@@ -234,7 +324,7 @@ def create_app(config: dict) -> Starlette:
             if any(_overlap(state, other) for other in state_dirs):
                 raise ValueError('Configure separate embedding state directories for each vault')
             state_dirs.append(state)
-        mounted.append((name, token, vault, writable, trash_dir, embeddings, state))
+        mounted.append((name, token, vault, writable, trash_dir, embeddings, state, integrations))
 
     if any(_overlap(trash, root) for trash in trash_dirs for root in roots):
         raise ValueError('The trash and vault directories must not overlap')
@@ -245,9 +335,10 @@ def create_app(config: dict) -> Starlette:
            for directory in (*roots, *trash_dirs, *state_dirs)):
         raise ValueError('Keep checker scripts outside vaults, trash and embedding state')
 
-    for name, token, vault, writable, trash_dir, embeddings, state in mounted:
+    for name, token, vault, writable, trash_dir, embeddings, state, integrations in mounted:
         search = SearchIndex(vault, embeddings, state) if state is not None else None
-        server = vault_server(name, vault, writable=writable, trash_dir=trash_dir, search=search)
+        server = vault_server(name, vault, writable=writable, trash_dir=trash_dir, search=search,
+                              iconic_offline=integrations['iconic_offline'], fsrs_dictionary=integrations['fsrs_dictionary'])
         app = server.streamable_http_app(stateless_http=True, json_response=True, transport_security=security)
         routes.append(Mount(f'/vaults/{name}', app=RequireBearer(app, token)))
         servers.append(server)

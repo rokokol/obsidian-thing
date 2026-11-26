@@ -60,14 +60,14 @@ Known types: `note`, `abstract`, `summary`, `tldr`, `info`, `todo`, `tip`, `hint
 
 ## broken_links
 
-Applies to Markdown. Each wikilink and embed must resolve inside the vault and inside the allowed paths. Resolution follows Obsidian: a name without a dot also matches a Markdown note, and a folder in the link narrows the match. A heading or block anchor must exist in the target note
+Applies to Markdown. Each wikilink and embed must resolve inside the vault and inside the allowed paths. A link can omit the `.md` extension. A folder in the link narrows the match. A heading or block anchor must exist in the target note
 
-Use `obsidian.links` to see the resolution of every link in a note before a write
+Use [`obsidian.links_out`](graph.md) to inspect the resolution of links in a note before a write
 
 ## bases
 
-Applies to `.base` files. The file must be valid YAML with a mapping at the top. A view type must be `table`, `cards`, `list` or `map`. Every `formula.<name>` in `order` or `properties` must exist under `formulas`
+The server checks Base structure on every write. Enable `bases` to report unknown view types and undefined formulas as warnings. See [structured edits](structured-edits.md)
 
 ## canvas
 
-Applies to `.canvas` files. The file must be valid JSON. Node identifiers are unique across nodes and edges. A node type is `text`, `file`, `link` or `group`, and carries its required field. Every node has integer `x`, `y`, `width` and `height`. An edge names existing nodes, and its sides and ends use the allowed values. A literal `\\n` in node text is a warning
+The server checks Canvas structure on every write. Enable `canvas` to warn about a literal `\\n` in node text. See [structured edits](structured-edits.md)

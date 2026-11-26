@@ -1,8 +1,9 @@
 import re
 from enum import Enum, auto
 
-import yaml
-from yaml.nodes import MappingNode, ScalarNode, SequenceNode
+from ruamel.yaml import YAML
+from ruamel.yaml.error import YAMLError
+from ruamel.yaml.nodes import MappingNode, ScalarNode, SequenceNode
 
 
 class FrontmatterState(Enum):
@@ -18,18 +19,26 @@ def frontmatter_state(markdown: str) -> FrontmatterState:
     return frontmatter_nodes(markdown)[0]
 
 
-def frontmatter_nodes(markdown: str) -> tuple[FrontmatterState, MappingNode | None]:
-    text = markdown.removeprefix('\ufeff')
-    opening = _DELIMITER.match(text)
+def frontmatter_span(text: str) -> tuple[FrontmatterState, tuple[int, int, int] | None]:
+    bom = int(text.startswith('\ufeff'))
+    opening = _DELIMITER.match(text[bom:])
     if opening is None:
         return FrontmatterState.ABSENT, None
-    closing = _DELIMITER.search(text, opening.end() + 1)
+    start = opening.end() + bom
+    closing = _DELIMITER.search(text, start + 1)
     if closing is None:
         return FrontmatterState.INVALID, None
+    return FrontmatterState.VALID, (start, closing.start(), closing.end())
+
+
+def frontmatter_nodes(markdown: str) -> tuple[FrontmatterState, MappingNode | None]:
+    state, span = frontmatter_span(markdown)
+    if span is None:
+        return state, None
     try:
         # Property names are text. Read the node tree without constructing YAML values.
-        root = yaml.compose(text[opening.end():closing.start()], Loader=yaml.BaseLoader)
-    except (yaml.YAMLError, RecursionError):
+        root = YAML(typ='base').compose(markdown[span[0]:span[1]])
+    except (YAMLError, RecursionError):
         return FrontmatterState.INVALID, None
     if root is None:
         return FrontmatterState.VALID, None

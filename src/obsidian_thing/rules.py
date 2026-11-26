@@ -1,17 +1,16 @@
-import json
 import re
 from collections import Counter
 from dataclasses import dataclass
 from typing import Literal
 from unicodedata import category
 
-import yaml
 from markdown_it import MarkdownIt
 from markdown_it.rules_inline import StateInline
 from mdit_py_plugins.dollarmath import dollarmath_plugin
 from mdit_py_plugins.front_matter import front_matter_plugin
 
 from .links import Resolver, iter_links
+from .structured_documents import load_base, load_canvas
 
 KNOWN_CHECKS = ('default_quotes', 'inner_quoter', 'trailing_periods', 'inline_code_equals',
                 'heading_math', 'unicode_math', 'link_math', 'paragraph_lines', 'callouts',
@@ -188,45 +187,73 @@ def _link_findings(text: str, path: str, resolver: Resolver) -> list[Finding]:
     return found
 
 
+def _valid_filter(value: object) -> bool:
+    pending = [value]
+    seen: set[int] = set()
+    while pending:
+        node = pending.pop()
+        if isinstance(node, str):
+            if not node.strip():
+                return False
+            continue
+        if not isinstance(node, dict) or len(node) != 1:
+            return False
+        key, children = next(iter(node.items()))
+        if key not in ('and', 'or', 'not') or not isinstance(children, list):
+            return False
+        if id(node) not in seen:
+            seen.add(id(node))
+            pending.extend(children)
+    return True
+
+
 def _base_findings(text: str) -> list[Finding]:
     try:
-        data = yaml.safe_load(text)
-    except yaml.YAMLError:
-        return [Finding('bases', 'yaml', 0, 'error', 'The base is not valid YAML')]
-    if not isinstance(data, dict):
-        return [Finding('bases', 'mapping', 0, 'error', 'A base is a YAML mapping')]
+        data = load_base(text)
+    except ValueError as error:
+        return [Finding('bases', 'yaml', 0, 'error', str(error))]
     found = []
-    raw_formulas = data.get('formulas')
-    formulas: dict[str, object] = raw_formulas if isinstance(raw_formulas, dict) else {}
-    views = data.get('views')
-    if views is not None and not isinstance(views, list):
-        found.append(Finding('bases', 'views', 0, 'error', 'views is a list'))
+    formulas = data.get('formulas', {})
+    if not isinstance(formulas, dict) or any(not isinstance(key, str) or not isinstance(value, str)
+                                             for key, value in formulas.items()):
+        found.append(Finding('bases', 'formulas', 0, 'error', 'formulas must map names to strings'))
+        formulas = {}
+    if 'filters' in data and not _valid_filter(data['filters']):
+        found.append(Finding('bases', 'filters', 0, 'error', 'Expected a filter string or filter group'))
+    views = data.get('views', [])
+    if not isinstance(views, list):
+        found.append(Finding('bases', 'views', 0, 'error', 'views must be a list'))
         views = []
-    for index, view in enumerate(views or []):
-        kind = view.get('type') if isinstance(view, dict) else None
-        if kind not in BASE_VIEWS:
-            found.append(Finding('bases', f'views[{index}].type', 0, 'warning',
-                                 f'Unknown view type "{kind}"'))
-        if isinstance(view, dict):
-            for field in ('order', 'properties'):
-                for name in view.get(field) or []:
+    for index, view in enumerate(views):
+        prefix = f'views[{index}]'
+        if not isinstance(view, dict):
+            found.append(Finding('bases', prefix, 0, 'error', 'A view must be a mapping'))
+            continue
+        kind = view.get('type')
+        if not isinstance(kind, str) or not kind.strip():
+            found.append(Finding('bases', prefix + '.type', 0, 'error', 'A view needs a type'))
+        elif kind not in BASE_VIEWS:
+            found.append(Finding('bases', prefix + '.type', 0, 'warning', f'Unknown view type "{kind}"'))
+        if 'name' in view and not isinstance(view['name'], str):
+            found.append(Finding('bases', prefix + '.name', 0, 'error', 'A view name must be a string'))
+        if 'filters' in view and not _valid_filter(view['filters']):
+            found.append(Finding('bases', prefix + '.filters', 0, 'error', 'Expected a filter string or filter group'))
+        for field in ('order', 'properties'):
+            fields = view.get(field, [])
+            if isinstance(fields, list):
+                for name in fields:
                     if isinstance(name, str) and name.startswith('formula.') and name[8:] not in formulas:
                         found.append(Finding('bases', name, 0, 'warning', f'{name} is not defined in formulas'))
-    for name in data.get('order') or []:
-        if isinstance(name, str) and name.startswith('formula.') and name[8:] not in formulas:
-            found.append(Finding('bases', name, 0, 'warning', f'{name} is not defined in formulas'))
     return found
 
 
 def _canvas_findings(text: str) -> list[Finding]:
     try:
-        data = json.loads(text)
-    except ValueError:
-        return [Finding('canvas', 'json', 0, 'error', 'The canvas is not valid JSON')]
-    if not isinstance(data, dict):
-        return [Finding('canvas', 'mapping', 0, 'error', 'A canvas is a JSON object')]
-    nodes = data.get('nodes') or []
-    edges = data.get('edges') or []
+        data = load_canvas(text)
+    except ValueError as error:
+        return [Finding('canvas', 'json', 0, 'error', str(error))]
+    nodes = data.get('nodes', [])
+    edges = data.get('edges', [])
     if not isinstance(nodes, list) or not isinstance(edges, list):
         return [Finding('canvas', 'arrays', 0, 'error', 'nodes and edges are arrays')]
     found = []
@@ -243,7 +270,7 @@ def _canvas_findings(text: str) -> list[Finding]:
             found.append(Finding('canvas', identifier, 0, 'error', f'Duplicate id {identifier}'))
         ids.add(identifier)
         kind = node.get('type')
-        if kind not in CANVAS_TYPES:
+        if not isinstance(kind, str) or kind not in CANVAS_TYPES:
             found.append(Finding('canvas', identifier, 0, 'error', f'Unknown node type "{kind}"'))
             continue
         for field in CANVAS_REQUIRED[kind]:
@@ -254,22 +281,37 @@ def _canvas_findings(text: str) -> list[Finding]:
                 found.append(Finding('canvas', identifier, 0, 'error', f'A node needs integer "{field}"'))
         if '\\\\n' in str(node.get('text', '')):
             found.append(Finding('canvas', identifier, 0, 'warning', 'A literal \\\\n renders as text; use \\n'))
+    node_ids = ids.copy()
     for edge in edges:
         if not isinstance(edge, dict):
             found.append(Finding('canvas', 'edge', 0, 'error', 'An edge is an object'))
             continue
         identifier = edge.get('id')
+        if not isinstance(identifier, str) or not identifier:
+            found.append(Finding('canvas', 'edge.id', 0, 'error', 'An edge has no id'))
+            continue
         for field in ('fromNode', 'toNode'):
-            if edge.get(field) not in ids:
-                found.append(Finding('canvas', str(identifier), 0, 'error', f'{field} names no node'))
+            endpoint = edge.get(field)
+            if not isinstance(endpoint, str) or endpoint not in node_ids:
+                found.append(Finding('canvas', identifier, 0, 'error', f'{field} names no node'))
         for field, allowed in (('fromSide', CANVAS_SIDES), ('toSide', CANVAS_SIDES),
                                ('fromEnd', CANVAS_ENDS), ('toEnd', CANVAS_ENDS)):
-            if field in edge and edge[field] not in allowed:
-                found.append(Finding('canvas', str(identifier), 0, 'warning', f'Unknown {field} "{edge[field]}"'))
+            if field in edge and (not isinstance(edge[field], str) or edge[field] not in allowed):
+                found.append(Finding('canvas', identifier, 0, 'error', f'Unknown {field} "{edge[field]}"'))
         if identifier in ids:
-            found.append(Finding('canvas', str(identifier), 0, 'error', f'Duplicate id {identifier}'))
-        ids.add(str(identifier))
+            found.append(Finding('canvas', identifier, 0, 'error', f'Duplicate id {identifier}'))
+        ids.add(identifier)
     return found
+
+
+def structured_errors(path: str, text: str) -> list[str]:
+    if path.lower().endswith('.base'):
+        findings = _base_findings(text)
+    elif path.lower().endswith('.canvas'):
+        findings = _canvas_findings(text)
+    else:
+        return []
+    return [f'{item.message}: {item.payload}' for item in findings if item.level == 'error']
 
 
 def _period_findings(text: str) -> list[Finding]:

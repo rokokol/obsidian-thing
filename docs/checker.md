@@ -12,7 +12,7 @@ The script receives one UTF-8 JSON object on stdin. `operation` is `write` or `u
 
 Exit with status zero and write one UTF-8 JSON response to stdout. Use `{"decision":"allow"}` to accept the change. Add `"warnings": ["message"]` to include warnings in the successful MCP reply. Use `{"decision":"reject","message":"reason"}` to block the write and show the reason to the client. Use nonempty, printable strings and do not include private note text in messages
 
-A timeout, nonzero exit, invalid response or stdout larger than 16 KiB blocks the write. The server discards stderr. The checker cannot return replacement text or change the result of `obsidian.delete`. This check applies only to writes through MCP
+A timeout, nonzero exit, invalid response or stdout larger than 16 KiB blocks the write. The server discards stderr. The checker cannot return replacement text or change the result of `obsidian.delete`. This check applies only to writes through MCP. A link edit from `obsidian.rename` uses `operation: update`. A rejection blocks the whole rename before it modifies files
 
 ## Vault context
 

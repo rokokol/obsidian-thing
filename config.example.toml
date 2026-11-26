@@ -3,7 +3,17 @@ root = "/path/to/vault"
 allowed = ["AGENTS.md", "Notes"]
 token_env = "OBSIDIAN_MCP_NOTES_TOKEN"
 writable = false
+# read_obsidian = true
 # protect_frontmatter = true
+# trash_dir = "/path/to/private/trash"
+
+# [vaults.notes.integrations]
+# canvas = true
+# bases = true
+# media_gallery = false
+# iconic_offline = false
+# fsrs_dictionary = false
+
 # [vaults.notes.checks]
 # default_quotes = '""'
 # inner_quoter = "«»"
@@ -18,7 +28,6 @@ writable = false
 # broken_links = true
 # bases = true
 # canvas = true
-# trash_dir = "/path/to/private/trash"
 
 # [vaults.notes.checker]
 # script = "/path/to/trusted/checker.py"

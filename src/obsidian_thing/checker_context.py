@@ -1,6 +1,6 @@
 import json
 
-from yaml.nodes import ScalarNode, SequenceNode
+from ruamel.yaml.nodes import ScalarNode, SequenceNode
 
 from .checker import CheckerError
 from .frontmatter import frontmatter_nodes

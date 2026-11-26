@@ -188,8 +188,9 @@ def vault_server(
                 return search.index(path)
 
         @server.tool(name='obsidian.query', description=(
-            'Search indexed Markdown (.md) and plain text (.txt) files by semantic similarity. '
-            'Only files that were indexed inside the embedding scope are searched.'
+            'Search indexed Markdown and plain text with FTS5 and embeddings. '
+            'If the embedding provider fails, return text matches and set vector_unavailable. '
+            'Search only indexed files inside the embedding scope.'
         ))
         def query(text: str, limit: int = 10) -> Matches:
             with _tool_errors():

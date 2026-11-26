@@ -39,6 +39,7 @@ writable = false
 # provider = "ollama"
 # model = "nomic-embed-text"
 # dimensions = 768
+# section_chunks = true # Set false to split by size instead of headings and paragraphs.
 # include_paths = ["Notes"]
 # exclude_paths = ["Notes/Private"]
 # For OpenRouter, select provider, model, dimensions and route for your endpoint.

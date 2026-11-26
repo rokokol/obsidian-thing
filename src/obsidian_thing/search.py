@@ -10,6 +10,7 @@ from threading import Lock
 from typing import NotRequired, TypedDict
 
 from .embeddings import Embedder, EmbeddingError
+from .index_policy import IndexPolicy
 from .search_chunks import Chunk, chunks
 from .vault import Vault, VaultError, _parts
 
@@ -53,8 +54,9 @@ class SearchIndex:
     chunk_size = 1500
     max_chunks = 32
 
-    def __init__(self, vault: Vault, config: dict, state: Path):
+    def __init__(self, vault: Vault, config: dict, state: Path, *, indexing: object = None):
         self.vault = vault
+        self.policy = indexing if isinstance(indexing, IndexPolicy) else IndexPolicy(vault, {} if indexing is None else indexing)
         self.include = _scope(config, 'include_paths')
         self.exclude = _scope(config, 'exclude_paths')
         self.section_chunks = config.get('section_chunks', True)
@@ -94,6 +96,8 @@ class SearchIndex:
 
     def _check_path(self, path: str) -> None:
         parts = _parts(path)
+        self.vault._allowed_parts(path)
+        self.policy.check(path)
         if PurePosixPath(path).suffix.lower() not in ('.md', '.txt'):
             raise VaultError('Only Markdown and plain text paths can use this index')
         if self.include and not any(parts[:len(prefix)] == prefix for prefix in self.include):
@@ -118,11 +122,13 @@ class SearchIndex:
             for digest, chunk in hashes.items():
                 if not db.execute('SELECT 1 FROM vectors WHERE profile = ? AND hash = ?',
                                   (profile, digest)).fetchone():
+                    if not self._is_current(path, revision):
+                        raise VaultError('The file changed or left the index scope during indexing')
                     vector = self.embedder.embed(chunk, operation)
                     with db:
                         db.execute('INSERT OR IGNORE INTO vectors VALUES (?, ?, ?)',
                                    (profile, digest, json.dumps(vector)))
-            if self.vault.read(path)['revision'] != revision:
+            if not self._is_current(path, revision):
                 raise VaultError('The file changed during indexing; try again')
             with db:
                 db.execute('DELETE FROM section_chunks WHERE profile = ? AND mode = ? AND path = ?',

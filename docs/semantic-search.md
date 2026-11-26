@@ -10,6 +10,14 @@ Set `section_chunks = false` in the vault's `embeddings` table to split by size 
 
 Run `obsidian.index` again for existing files after upgrade or after a mode change if that mode has no current index for the file. Search does not use entries from the previous format or the other mode. It can reuse cached vectors for unchanged model inputs
 
+## Index exclusions
+
+Set `indexing.exclude` per vault to replace the default patterns `*.tmp`, `*.swp`, and `*~`. Patterns use `.gitignore` syntax relative to the vault root. An empty list disables these patterns. Hidden paths, including `.git`, and symlinks remain outside the index
+
+Set `indexing.respect_gitignore = true` to also use `.gitignore` files from the vault root and its subdirectories. Nested files and `!` patterns apply. A negation cannot restore a file under an ignored directory. The server ignores symlinked `.gitignore` files. It does not use global Git rules or `.git/info/exclude`
+
+These rules apply to explicit `obsidian.index` and `obsidian.related` calls, as well as search results. They do not change vault read access or link resolution. If a rule excludes a path after indexing, search hides its old entries without waiting for a new index operation
+
 ## Full-text and hybrid search
 
 `obsidian.index` records local FTS5 entries before it requests vectors. If the provider fails, the call reports the error, but the text entries remain available. Run the index tool on previously indexed files to add their text entries. Only current files in the configured vault and embedding scope can appear in either result list

@@ -12,6 +12,44 @@ from obsidian_thing.server import create_app
 from obsidian_thing.vault import Vault, VaultError
 
 
+def test_indexing_exclusions_apply_to_explicit_tools_and_old_results(tmp_path, monkeypatch):
+    root = tmp_path / 'vault'
+    root.mkdir()
+    state = tmp_path / 'state'
+    state.mkdir(mode=0o700)
+    paths = ('Drafts/local.md', 'nested/hidden.md', 'nested/show.md', 'tree/keep.md', 'root.md')
+    for path in paths:
+        target = root / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text('distinctive term')
+    (root / '.gitignore').write_text('tree/\n!tree/keep.md\n')
+    (root / 'nested' / '.gitignore').write_text('*.md\n!show.md\n')
+    vault = Vault(root, ['.'])
+    config = dict(provider='ollama', model='synthetic', dimensions=2)
+    calls = []
+
+    def embed(self, text, operation):
+        calls.append(operation)
+        return [1.0, 0.0]
+
+    monkeypatch.setattr(Embedder, 'embed', embed)
+    unrestricted = SearchIndex(vault, config, state)
+    for path in paths:
+        unrestricted.index(path)
+    restricted = SearchIndex(vault, config, state, indexing={'exclude': ['Drafts/**'], 'respect_gitignore': True})
+    calls.clear()
+    for path in ('Drafts/local.md', 'nested/hidden.md', 'tree/keep.md'):
+        with pytest.raises(VaultError, match='excluded from indexing'):
+            restricted.index(path)
+        with pytest.raises(VaultError, match='excluded from indexing'):
+            restricted.related(path, 10, 0)
+        assert vault.read(path)['content'] == 'distinctive term'
+    assert not calls
+    assert [hit['path'] for hit in restricted.query('distinctive', 10)['matches']] == ['nested/show.md', 'root.md']
+    (root / 'nested' / '.gitignore').write_text('*.md\n')
+    assert [hit['path'] for hit in restricted.query('distinctive', 10)['matches']] == ['root.md']
+
+
 def test_query_combines_exact_and_semantic_matches_and_falls_back(tmp_path, monkeypatch):
     root = tmp_path / 'vault'
     root.mkdir()

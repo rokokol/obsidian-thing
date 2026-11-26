@@ -34,6 +34,10 @@ writable = false
 # timeout_seconds = 2
 # vault_context_properties = ["aliases", "tags", "up", "prev", "next"]
 
+# [vaults.notes.indexing]
+# exclude = ["*.tmp", "*.swp", "*~"]
+# respect_gitignore = false
+
 # [vaults.notes.embeddings]
 # state_dir = "/path/to/private/embedding-state"
 # provider = "ollama"

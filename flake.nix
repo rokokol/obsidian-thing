@@ -32,6 +32,7 @@
             };
             build-system = [ pkgs.python3Packages.hatchling ];
             dependencies = [
+              pkgs.python3Packages.pathspec
               pkgs.python3Packages.markdown-it-py
               pkgs.python3Packages.mcp
               pkgs.python3Packages.mdit-py-plugins

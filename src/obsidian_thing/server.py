@@ -19,6 +19,7 @@ from .fsrs import (Change as FsrsChange, DictionaryList, DictionaryPage, History
                    history, list_dictionaries, read_dictionary)
 from .graph import Attachment, Backlinks, Edge
 from .iconic import IconChanges, IconResult, set_icon
+from .index_policy import IndexPolicy
 from .rules import KNOWN_CHECKS, QUOTE_KEYS, _quote_pair
 from .search import Matches, SearchIndex
 from .structured_documents import BaseChange, CanvasChange
@@ -306,6 +307,7 @@ def create_app(config: dict) -> Starlette:
         vault = Vault(Path(settings['root']), allowed, checker=checker, protect_frontmatter=protect_frontmatter,
                       checks=checks, read_obsidian=read_obsidian, canvas=integrations['canvas'],
                       bases=integrations['bases'], media_gallery=integrations['media_gallery'])
+        policy = IndexPolicy(vault, settings.get('indexing', {}))
         roots.append(vault.root)
         trash_dir = None
         if 'trash_dir' in settings:
@@ -325,7 +327,7 @@ def create_app(config: dict) -> Starlette:
             if any(_overlap(state, other) for other in state_dirs):
                 raise ValueError('Configure separate embedding state directories for each vault')
             state_dirs.append(state)
-        mounted.append((name, token, vault, writable, trash_dir, embeddings, state, integrations))
+        mounted.append((name, token, vault, writable, trash_dir, embeddings, state, integrations, policy))
 
     if any(_overlap(trash, root) for trash in trash_dirs for root in roots):
         raise ValueError('The trash and vault directories must not overlap')
@@ -336,8 +338,8 @@ def create_app(config: dict) -> Starlette:
            for directory in (*roots, *trash_dirs, *state_dirs)):
         raise ValueError('Keep checker scripts outside vaults, trash and embedding state')
 
-    for name, token, vault, writable, trash_dir, embeddings, state, integrations in mounted:
-        search = SearchIndex(vault, embeddings, state) if state is not None else None
+    for name, token, vault, writable, trash_dir, embeddings, state, integrations, policy in mounted:
+        search = SearchIndex(vault, embeddings, state, indexing=policy) if state is not None else None
         server = vault_server(name, vault, writable=writable, trash_dir=trash_dir, search=search,
                               iconic_offline=integrations['iconic_offline'], fsrs_dictionary=integrations['fsrs_dictionary'])
         app = server.streamable_http_app(stateless_http=True, json_response=True, transport_security=security)

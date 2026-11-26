@@ -20,7 +20,7 @@ These rules apply to explicit `obsidian.index` and `obsidian.related` calls, as 
 
 ## Full-text and hybrid search
 
-`obsidian.index` records local FTS5 entries before it requests vectors. If the provider fails, the call reports the error, but the text entries remain available. Run the index tool on previously indexed files to add their text entries. Only current files in the configured vault and embedding scope can appear in either result list
+`obsidian.index` records local FTS5 entries before it requests vectors. If the provider fails, the call reports the error, but the text entries remain available. Run the index tool on previously indexed files to add their text entries. Both result lists enforce vault access and index exclusions. Only vector results must also fall inside the embedding scope
 
 `obsidian.query` treats the input as ordinary text, not FTS5 syntax. It searches for any of the query words. Underscores stay inside tokens, so a term such as `section_chunks` stays intact. The tokenizer does not reduce Russian words to their base forms
 

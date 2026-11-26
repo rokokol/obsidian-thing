@@ -1,4 +1,5 @@
 import json
+import os
 import sqlite3
 from io import BytesIO
 
@@ -10,6 +11,45 @@ from obsidian_thing.embeddings import Embedder, EmbeddingError
 from obsidian_thing.search import SearchIndex
 from obsidian_thing.server import create_app
 from obsidian_thing.vault import Vault, VaultError
+
+
+def test_local_reconciliation_detects_same_size_and_mtime_and_never_embeds(tmp_path, monkeypatch):
+    root = tmp_path / 'vault'
+    root.mkdir()
+    state = tmp_path / 'state'
+    state.mkdir(mode=0o700)
+    note = root / 'private.md'
+    note.write_text('before [[target]]')
+    (root / 'target.md').write_text('destination')
+    (root / 'scratch.tmp.md').write_text('scratch')
+    calls = []
+
+    def offline(self, text, operation):
+        calls.append(operation)
+        raise EmbeddingError('offline')
+
+    monkeypatch.setattr(Embedder, 'embed', offline)
+    vault = Vault(root, ['.'])
+    index = SearchIndex(vault, dict(provider='ollama', model='synthetic', dimensions=2,
+                        exclude_paths=['private.md']), state, indexing={'exclude': ['*.tmp.md']})
+    index.reconcile_local()
+    assert calls == []
+    assert [hit['path'] for hit in index.query('before', 10)['matches']] == ['private.md']
+    assert index.query('scratch', 10)['matches'] == []
+    assert vault.graph.incoming('target.md')['links'][0]['source'] == 'private.md'
+    original = note.stat()
+    note.write_text('after! [[target]]')
+    os.utime(note, ns=(original.st_atime_ns, original.st_mtime_ns))
+    assert note.stat().st_size == original.st_size and note.stat().st_mtime_ns == original.st_mtime_ns
+    index.reconcile_local()
+    assert index.query('before', 10)['matches'] == []
+    assert [hit['path'] for hit in index.query('after', 10)['matches']] == ['private.md']
+    note.rename(root / 'moved.md')
+    index.reconcile_local(['private.md', 'moved.md'])
+    assert [hit['path'] for hit in index.query('after', 10)['matches']] == ['moved.md']
+    with sqlite3.connect(index.database) as db:
+        assert db.execute('SELECT path FROM lexical_chunks WHERE path = ?', ('private.md',)).fetchall() == []
+    assert all(operation == 'query' for operation in calls)
 
 
 def test_indexing_exclusions_apply_to_explicit_tools_and_old_results(tmp_path, monkeypatch):

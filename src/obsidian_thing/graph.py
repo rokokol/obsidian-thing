@@ -300,6 +300,21 @@ class LinkGraph:
             self._cache[path] = revision, edges
             return edges
 
+    def refresh(self, path: str, note: TextFile | None = None) -> None:
+        if not self._is_source(path):
+            return
+        try:
+            self.vault._allowed_parts(path)
+            self._extract(note if note is not None else self.vault.read(path))
+        except VaultError:
+            with self._lock:
+                self._cache.pop(path, None)
+
+    def prune(self, visible: set[str]) -> None:
+        with self._lock:
+            for deleted in self._cache.keys() - visible:
+                del self._cache[deleted]
+
     def outgoing(self, path: str) -> list[Edge]:
         if not self._is_source(path) or path.startswith('.obsidian/'):
             raise VaultError('The path must name a Markdown note, Canvas or Base')
@@ -311,9 +326,7 @@ class LinkGraph:
         self.vault.file_size(path)
         resolver = Resolver(self.vault)
         notes = [source for source in resolver.files() if self._is_source(source)]
-        with self._lock:
-            for deleted in set(self._cache).difference(notes):
-                del self._cache[deleted]
+        self.prune(set(notes))
         links: list[Edge] = []
         skipped: list[str] = []
         for source in notes:

@@ -2,6 +2,7 @@ import json
 import math
 import re
 import sqlite3
+from collections.abc import Iterable
 from contextlib import closing
 from hashlib import sha256
 from itertools import islice
@@ -12,7 +13,7 @@ from typing import NotRequired, TypedDict
 from .embeddings import Embedder, EmbeddingError
 from .index_policy import IndexPolicy
 from .search_chunks import Chunk, chunks
-from .vault import Vault, VaultError, _parts
+from .vault import TextFile, Vault, VaultError, _parts
 
 
 class Match(TypedDict):
@@ -67,7 +68,9 @@ class SearchIndex:
         self.embedder = Embedder(config, state)
         self.database = state / 'search.sqlite3'
         self.index_lock = Lock()
+        self.local_lock = Lock()
         with closing(sqlite3.connect(self.database)) as db, db:
+            db.execute('PRAGMA journal_mode = WAL')
             db.executescript('''
                 CREATE TABLE IF NOT EXISTS vectors (
                     profile TEXT, hash TEXT, vector TEXT NOT NULL, PRIMARY KEY (profile, hash)
@@ -76,6 +79,10 @@ class SearchIndex:
                     profile TEXT, mode INTEGER, path TEXT, revision TEXT NOT NULL, hash TEXT NOT NULL,
                     ordinal INTEGER, headings TEXT NOT NULL, line_start INTEGER, line_end INTEGER,
                     PRIMARY KEY (profile, mode, path, ordinal)
+                );
+                CREATE TABLE IF NOT EXISTS local_files (
+                    mode INTEGER NOT NULL, path TEXT NOT NULL, revision TEXT NOT NULL,
+                    PRIMARY KEY (mode, path)
                 );
                 CREATE TABLE IF NOT EXISTS lexical_chunks (
                     id INTEGER PRIMARY KEY, mode INTEGER NOT NULL, path TEXT NOT NULL,
@@ -94,12 +101,19 @@ class SearchIndex:
                 END;
             ''')
 
-    def _check_path(self, path: str) -> None:
-        parts = _parts(path)
+    @staticmethod
+    def _supports_text(path: str) -> bool:
+        return PurePosixPath(path).suffix.lower() in ('.md', '.txt')
+
+    def _check_local_path(self, path: str) -> None:
         self.vault._allowed_parts(path)
         self.policy.check(path)
-        if PurePosixPath(path).suffix.lower() not in ('.md', '.txt'):
+        if not self._supports_text(path):
             raise VaultError('Only Markdown and plain text paths can use this index')
+
+    def _check_path(self, path: str) -> None:
+        self._check_local_path(path)
+        parts = _parts(path)
         if self.include and not any(parts[:len(prefix)] == prefix for prefix in self.include):
             raise VaultError('The path is outside the embedding scope')
         if any(parts[:len(prefix)] == prefix for prefix in self.exclude):
@@ -111,12 +125,9 @@ class SearchIndex:
         with self.index_lock, closing(sqlite3.connect(self.database)) as db:
             note = self.vault.read(path)
             revision = note['revision']
-            fragments = list(islice(chunks(note['content'], self.chunk_size,
-                                           markdown=path.lower().endswith('.md'), sections=self.section_chunks),
-                                    self.max_chunks + 1))
-            if len(fragments) > self.max_chunks:
-                raise VaultError('The file exceeds the semantic index size limit')
-            self._index_lexical(db, path, revision, fragments)
+            fragments = self._fragments(note)
+            with self.local_lock:
+                self._index_lexical(db, path, revision, fragments)
             digests = [sha256(chunk.text.encode()).hexdigest() for chunk in fragments]
             hashes = {digest: chunk.text for digest, chunk in zip(digests, fragments, strict=True)}
             for digest, chunk in hashes.items():
@@ -128,9 +139,9 @@ class SearchIndex:
                     with db:
                         db.execute('INSERT OR IGNORE INTO vectors VALUES (?, ?, ?)',
                                    (profile, digest, json.dumps(vector)))
-            if not self._is_current(path, revision):
-                raise VaultError('The file changed during indexing; try again')
-            with db:
+            with self.local_lock, db:
+                if not self._is_current(path, revision):
+                    raise VaultError('The file changed during indexing; try again')
                 db.execute('DELETE FROM section_chunks WHERE profile = ? AND mode = ? AND path = ?',
                            (profile, self.section_chunks, path))
                 db.executemany('INSERT INTO section_chunks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', (
@@ -140,12 +151,64 @@ class SearchIndex:
                 ))
         return {'path': path, 'revision': revision, 'chunks': len(fragments)}
 
+    def _fragments(self, note: TextFile) -> list[Chunk]:
+        fragments = list(islice(chunks(note['content'], self.chunk_size,
+                                       markdown=note['path'].lower().endswith('.md'), sections=self.section_chunks),
+                                self.max_chunks + 1))
+        if len(fragments) > self.max_chunks:
+            raise VaultError('The file exceeds the semantic index size limit')
+        return fragments
+
+    def reconcile_local(self, paths: Iterable[str] | None = None) -> dict[str, str]:
+        with closing(sqlite3.connect(self.database)) as db:
+            if paths is None:
+                visible = set(self.vault.visible_files())
+                self.vault.graph.prune(visible)
+                saved = {path for path, in db.execute('''
+                    SELECT path FROM local_files UNION SELECT path FROM lexical_chunks
+                    UNION SELECT path FROM section_chunks
+                ''')}
+                paths = visible | saved
+            revisions = {}
+            for path in sorted(set(paths)):
+                if not self._supports_text(path):
+                    self.vault.graph.refresh(path)
+                    continue
+                with self.local_lock:
+                    try:
+                        self.vault._allowed_parts(path)
+                        note = self.vault.read(path)
+                    except VaultError:
+                        self.vault.graph.refresh(path)
+                        self._drop_path(db, path)
+                        continue
+                    self.vault.graph.refresh(path, note)
+                    try:
+                        self._check_local_path(path)
+                        revision = note['revision']
+                        if not self._lexical_is_current(db, path, revision):
+                            self._index_lexical(db, path, revision, self._fragments(note))
+                        revisions[path] = revision
+                    except VaultError:
+                        self._drop_path(db, path)
+            return revisions
+
+    @staticmethod
+    def _drop_path(db: sqlite3.Connection, path: str) -> None:
+        with db:
+            db.execute('DELETE FROM local_files WHERE path = ?', (path,))
+            db.execute('DELETE FROM lexical_chunks WHERE path = ?', (path,))
+            db.execute('DELETE FROM section_chunks WHERE path = ?', (path,))
+
+    def _lexical_is_current(self, db: sqlite3.Connection, path: str, revision: str) -> bool:
+        return db.execute('SELECT 1 FROM local_files WHERE mode = ? AND path = ? AND revision = ?',
+                          (self.section_chunks, path, revision)).fetchone() is not None
+
     def _index_lexical(self, db: sqlite3.Connection, path: str, revision: str, fragments: list[Chunk]) -> None:
         key = self.section_chunks, path
-        if db.execute('SELECT 1 FROM lexical_chunks WHERE mode = ? AND path = ? AND revision = ? LIMIT 1',
-                      (*key, revision)).fetchone():
+        if self._lexical_is_current(db, path, revision):
             return
-        if not self._is_current(path, revision):
+        if not self._is_current(path, revision, local=True):
             raise VaultError('The file changed during indexing; try again')
         with db:
             db.execute('DELETE FROM lexical_chunks WHERE mode = ? AND path = ?', key)
@@ -154,6 +217,8 @@ class SearchIndex:
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             ''', ((*key, revision, json.dumps(chunk.headings), chunk.line_start, chunk.line_end, chunk.text)
                   for chunk in fragments))
+            db.execute('INSERT OR REPLACE INTO local_files VALUES (?, ?, ?)', (*key, revision))
+            db.execute('DELETE FROM section_chunks WHERE path = ? AND revision != ?', (path, revision))
 
     def _validate_limit(self, limit: int) -> None:
         if not 1 <= limit <= self.max_results:
@@ -183,9 +248,9 @@ class SearchIndex:
         semantic = self._match(vectors, self.max_results, -1)['matches']
         return {'matches': _merge_ranks(lexical, semantic)[:limit]}
 
-    def _is_current(self, path: str, revision: str) -> bool:
+    def _is_current(self, path: str, revision: str, *, local: bool = False) -> bool:
         try:
-            self._check_path(path)
+            (self._check_local_path if local else self._check_path)(path)
             return self.vault.read(path)['revision'] == revision
         except VaultError:
             return False
@@ -206,7 +271,7 @@ class SearchIndex:
                 if path in seen:
                     continue
                 seen.add(path)
-                if not self._is_current(path, revision):
+                if not self._is_current(path, revision, local=True):
                     continue
                 hits.append({'path': path, 'score': score, 'headings': json.loads(headings),
                              'line_start': start, 'line_end': end})

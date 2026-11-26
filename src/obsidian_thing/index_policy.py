@@ -13,7 +13,7 @@ def _parse(text: str) -> GitIgnoreSpec:
 
 class IndexPolicy:
     def __init__(self, vault: Vault, settings: object):
-        if not isinstance(settings, dict) or settings.keys() - {'exclude', 'respect_gitignore'}:
+        if not isinstance(settings, dict) or settings.keys() - {'exclude', 'respect_gitignore', 'auto', 'scan_seconds'}:
             raise ValueError('Configure indexing as a table with supported keys')
         patterns = settings.get('exclude', ['*.tmp', '*.swp', '*~'])
         if not isinstance(patterns, list) or not all(isinstance(line, str) and '\n' not in line and
@@ -24,6 +24,14 @@ class IndexPolicy:
         if not isinstance(respect, bool):
             raise ValueError('Configure indexing.respect_gitignore as a boolean')
         self.respect_gitignore = respect
+        auto = settings.get('auto', False)
+        seconds = settings.get('scan_seconds', 300)
+        if not isinstance(auto, bool):
+            raise ValueError('Configure indexing.auto as a boolean')
+        if type(seconds) is not int or not 1 <= seconds <= 86400:
+            raise ValueError('Configure indexing.scan_seconds as an integer from 1 to 86400')
+        self.auto = auto
+        self.scan_seconds = seconds
         self.vault = vault
 
     def _ignore_at(self, directory: tuple[str, ...]) -> GitIgnoreSpec | None:

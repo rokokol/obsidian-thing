@@ -18,6 +18,12 @@ Set `indexing.respect_gitignore = true` to also use `.gitignore` files from the 
 
 These rules apply to explicit `obsidian.index` and `obsidian.related` calls, as well as search results. They do not change vault read access or link resolution. If a rule excludes a path after indexing, search hides its old entries without waiting for a new index operation
 
+## Automatic local index updates
+
+Set `indexing.auto = true` for a vault with a configured `embeddings` table. The server scans the vault at startup and at intervals set by `indexing.scan_seconds`. The default interval is 300 seconds, with a small random variation. These updates refresh FTS5 and the link cache without a call to the model
+
+On Linux, file events trigger checks for specific paths. A directory change, lost events, or a replaced vault root triggers a full scan. Other systems and failed file watches use periodic scans. These updates do not fill the vector index. `obsidian.index` and `obsidian.related` can still request vectors
+
 ## Full-text and hybrid search
 
 `obsidian.index` records local FTS5 entries before it requests vectors. If the provider fails, the call reports the error, but the text entries remain available. Run the index tool on previously indexed files to add their text entries. Both result lists enforce vault access and index exclusions. Only vector results must also fall inside the embedding scope

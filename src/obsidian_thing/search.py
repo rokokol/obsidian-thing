@@ -2,7 +2,7 @@ import json
 import math
 import re
 import sqlite3
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from contextlib import closing
 from hashlib import sha256
 from itertools import islice
@@ -159,7 +159,8 @@ class SearchIndex:
             raise VaultError('The file exceeds the semantic index size limit')
         return fragments
 
-    def reconcile_local(self, paths: Iterable[str] | None = None) -> dict[str, str]:
+    def reconcile_local(self, paths: Iterable[str] | None = None, *,
+                        stop: Callable[[], bool] | None = None) -> dict[str, str]:
         with closing(sqlite3.connect(self.database)) as db:
             if paths is None:
                 visible = set(self.vault.visible_files())
@@ -171,6 +172,8 @@ class SearchIndex:
                 paths = visible | saved
             revisions = {}
             for path in sorted(set(paths)):
+                if stop is not None and stop():
+                    break
                 if not self._supports_text(path):
                     self.vault.graph.refresh(path)
                     continue

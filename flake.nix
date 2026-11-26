@@ -32,6 +32,7 @@
             };
             build-system = [ pkgs.python3Packages.hatchling ];
             dependencies = [
+              pkgs.python3Packages.inotify-simple
               pkgs.python3Packages.pathspec
               pkgs.python3Packages.markdown-it-py
               pkgs.python3Packages.mcp

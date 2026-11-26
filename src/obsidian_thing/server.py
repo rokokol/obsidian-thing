@@ -12,6 +12,7 @@ from starlette.datastructures import Headers
 from starlette.responses import Response
 from starlette.routing import Mount
 from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.concurrency import run_in_threadpool
 
 from .checker import Checker, CheckerError
 from .embeddings import EmbeddingError
@@ -20,6 +21,7 @@ from .fsrs import (Change as FsrsChange, DictionaryList, DictionaryPage, History
 from .graph import Attachment, Backlinks, Edge
 from .iconic import IconChanges, IconResult, set_icon
 from .index_policy import IndexPolicy
+from .index_watcher import IndexWatcher
 from .rules import KNOWN_CHECKS, QUOTE_KEYS, _quote_pair
 from .search import Matches, SearchIndex
 from .structured_documents import BaseChange, CanvasChange
@@ -191,7 +193,7 @@ def vault_server(
         @server.tool(name='obsidian.query', description=(
             'Search indexed Markdown and plain text with FTS5 and embeddings. '
             'If the embedding provider fails, return text matches and set vector_unavailable. '
-            'Search only indexed files inside the embedding scope.'
+            'Search only current files in the index. Vector results also require the embedding scope.'
         ))
         def query(text: str, limit: int = 10) -> Matches:
             with _tool_errors():
@@ -263,6 +265,7 @@ def create_app(config: dict) -> Starlette:
         raise ValueError('Configure at least one vault')
     routes = []
     servers = []
+    watchers: list[IndexWatcher] = []
     roots = []
     trash_dirs = set()
     state_dirs: list[Path] = []
@@ -327,6 +330,8 @@ def create_app(config: dict) -> Starlette:
             if any(_overlap(state, other) for other in state_dirs):
                 raise ValueError('Configure separate embedding state directories for each vault')
             state_dirs.append(state)
+        if policy.auto and state is None:
+            raise ValueError('Automatic indexing needs an embeddings state directory')
         mounted.append((name, token, vault, writable, trash_dir, embeddings, state, integrations, policy))
 
     if any(_overlap(trash, root) for trash in trash_dirs for root in roots):
@@ -340,6 +345,8 @@ def create_app(config: dict) -> Starlette:
 
     for name, token, vault, writable, trash_dir, embeddings, state, integrations, policy in mounted:
         search = SearchIndex(vault, embeddings, state, indexing=policy) if state is not None else None
+        if search is not None and policy.auto:
+            watchers.append(IndexWatcher(search))
         server = vault_server(name, vault, writable=writable, trash_dir=trash_dir, search=search,
                               iconic_offline=integrations['iconic_offline'], fsrs_dictionary=integrations['fsrs_dictionary'])
         app = server.streamable_http_app(stateless_http=True, json_response=True, transport_security=security)
@@ -351,6 +358,9 @@ def create_app(config: dict) -> Starlette:
         async with AsyncExitStack() as stack:
             for server in servers:
                 await stack.enter_async_context(server.session_manager.run())
+            for watcher in watchers:
+                watcher.start()
+                stack.push_async_callback(run_in_threadpool, watcher.stop)
             yield
 
     return Starlette(routes=routes, lifespan=lifespan)

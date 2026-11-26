@@ -59,7 +59,7 @@ docker run --rm --read-only --user "$(id -u):$(id -g)" \
 
 Enable embeddings per vault with the settings in [`config.example.toml`](config.example.toml). Create a private state directory outside the vault and mount it writable in Docker. Use a separate directory for each vault
 
-Call `obsidian.index` to index one Markdown or plain-text file. Use `obsidian.query` for a text query or `obsidian.related` for neighbors of a note. `obsidian.related` indexes the source if needed, but searches only indexed files. The server skips deleted and outdated results. There is no background indexer yet
+Call `obsidian.index` to index one Markdown or plain-text file. Use `obsidian.query` for a text query or `obsidian.related` for neighbors of a note. `obsidian.related` indexes the source if needed, but searches only indexed files. The server skips deleted and outdated results. You can enable [automatic updates to the local index](docs/semantic-search.md#automatic-local-index-updates)
 
 Ollama requires a loopback endpoint in the server's network namespace. OpenRouter sends text to a cloud provider only when you set `allow_cloud = true` and specify `include_paths`. The vault token then permits indexing within those paths and sending text queries. The request selects one route and requires zero data retention, denies data collection, and disables fallback
 

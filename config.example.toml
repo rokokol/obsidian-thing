@@ -35,6 +35,8 @@ writable = false
 # vault_context_properties = ["aliases", "tags", "up", "prev", "next"]
 
 # [vaults.notes.indexing]
+# auto = false
+# scan_seconds = 300
 # exclude = ["*.tmp", "*.swp", "*~"]
 # respect_gitignore = false
 

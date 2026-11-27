@@ -1,10 +1,21 @@
 {
   description = "MCP server for local Obsidian vaults";
 
-  inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nix-best-practices = {
+      url = "github:rokokol/nix-best-practices-skill";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+  };
 
   outputs =
-    { self, nixpkgs, ... }:
+    {
+      self,
+      nixpkgs,
+      nix-best-practices,
+      ...
+    }:
     let
       inherit (nixpkgs) lib;
       systems = [
@@ -17,7 +28,7 @@
       packages = forAllSystems (
         pkgs:
         let
-          project = (builtins.fromTOML (builtins.readFile ./pyproject.toml)).project;
+          inherit (builtins.fromTOML (builtins.readFile ./pyproject.toml)) project;
           app = pkgs.python3Packages.buildPythonApplication {
             pname = project.name;
             version = lib.fileContents ./VERSION;
@@ -30,26 +41,26 @@
                 ./src
               ];
             };
-            build-system = [ pkgs.python3Packages.hatchling ];
-            dependencies = [
-              pkgs.python3Packages.croniter
-              pkgs.python3Packages.inotify-simple
-              pkgs.python3Packages.pathspec
-              pkgs.python3Packages.markdown-it-py
-              pkgs.python3Packages.mcp
-              pkgs.python3Packages.mdit-py-plugins
-              pkgs.python3Packages.pillow
-              pkgs.python3Packages.pypdf
-              pkgs.python3Packages.prometheus-client
-              pkgs.python3Packages.ruamel-yaml
-              pkgs.python3Packages.starlette
-              pkgs.python3Packages.uvicorn
+            build-system = with pkgs.python3Packages; [ hatchling ];
+            dependencies = with pkgs.python3Packages; [
+              croniter
+              inotify-simple
+              pathspec
+              markdown-it-py
+              mcp
+              mdit-py-plugins
+              pillow
+              pypdf
+              prometheus-client
+              ruamel-yaml
+              starlette
+              uvicorn
             ];
             makeWrapperArgs = [
               "--prefix"
               "PATH"
               ":"
-              (lib.makeBinPath [ pkgs.ffmpeg-headless ])
+              (lib.makeBinPath (with pkgs; [ ffmpeg-headless ]))
             ];
             pythonImportsCheck = [ "obsidian_thing.server" ];
             meta = {
@@ -62,7 +73,7 @@
         {
           default = app;
           docker = pkgs.dockerTools.buildLayeredImage {
-            name = project.name;
+            inherit (project) name;
             tag = "local";
             config = {
               Entrypoint = [ (lib.getExe app) ];
@@ -82,13 +93,21 @@
 
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShell {
-          packages = [
-            pkgs.actionlint
-            pkgs.ffmpeg-headless
-            pkgs.pyright
-            pkgs.python3
-            pkgs.uv
+          packages = with pkgs; [
+            actionlint
+            ffmpeg-headless
+            pyright
+            python3
+            uv
           ];
+        };
+      });
+
+      checks = forAllSystems (pkgs: {
+        nix-lint = nix-best-practices.lib.mkCheck {
+          inherit pkgs;
+          root = ./.;
+          namespaces = [ "obsidian-thing" ];
         };
       });
 

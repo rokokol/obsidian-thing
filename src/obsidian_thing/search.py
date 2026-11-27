@@ -501,7 +501,16 @@ class SearchIndex:
                 if group_sections and ('line_start' in location or 'page' in location):
                     sections.setdefault(key, []).append(location)
                 if is_best:
-                    best[key] = {**location, 'path': path}
+                    hit: Match = {'path': path, 'score': score}
+                    if 'headings' in location:
+                        hit['headings'] = location['headings']
+                    if 'line_start' in location:
+                        hit['line_start'] = location['line_start']
+                    if 'line_end' in location:
+                        hit['line_end'] = location['line_end']
+                    if 'page' in location:
+                        hit['page'] = location['page']
+                    best[key] = hit
         hits: list[Match] = []
         for (path, revision), hit in sorted(best.items(), key=lambda item: (-item[1]['score'], item[0][0])):
             if len(hits) == limit:

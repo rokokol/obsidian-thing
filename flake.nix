@@ -4,7 +4,7 @@
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
   outputs =
-    { nixpkgs, ... }:
+    { self, nixpkgs, ... }:
     let
       inherit (nixpkgs) lib;
       systems = [
@@ -72,6 +72,13 @@
           };
         }
       );
+
+      nixosModules.default =
+        { lib, pkgs, ... }:
+        {
+          imports = [ ./nixos-module.nix ];
+          obsidian-thing.package = lib.mkDefault self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+        };
 
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShell {

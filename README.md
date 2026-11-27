@@ -31,10 +31,11 @@ To restore a deletion, read `$trash_dir/<trash_id>/path` for the original vault-
 - [Python write checker](docs/checker.md): configure a script to warn about or reject proposed edits
 - [Markdown rules for writes](docs/vault-rules.md): check quotes, periods, links and callout markers before a write
 - [Example checker](examples/checker.py): a starting point for vault-specific rules
+- [NixOS service](docs/nixos.md): configure the MCP server as a system service
 
 ## Run with Nix or Docker
 
-Build from a Git checkout with secrets excluded from tracked files. Without Git, copy only `flake.nix`, `flake.lock`, `pyproject.toml`, `VERSION`, and `src/` to a clean directory first. Nix can copy an entire local source tree to its store
+Build from a Git checkout with secrets excluded from tracked files. Without Git, copy only `flake.nix`, `flake.lock`, `nixos-module.nix`, `pyproject.toml`, `VERSION`, and `src/` to a clean directory first. Nix can copy an entire local source tree to its store
 
 ```sh
 nix run . -- --config /absolute/path/to/config.toml

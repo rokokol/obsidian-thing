@@ -1,3 +1,5 @@
+# metrics_token_env = "OBSIDIAN_THING_METRICS_TOKEN"
+
 [vaults.notes]
 root = "/path/to/vault"
 allowed = ["AGENTS.md", "Notes"]
@@ -41,6 +43,7 @@ writable = false
 # respect_gitignore = false
 
 # [vaults.notes.embeddings]
+# enabled = false # Use only full-text search if state_dir is set
 # state_dir = "/path/to/private/embedding-state"
 # provider = "ollama"
 # model = "nomic-embed-text"
@@ -50,9 +53,18 @@ writable = false
 # section_chunks = true # Set false to split by size instead of headings and paragraphs.
 # include_paths = ["Notes"]
 # exclude_paths = ["Notes/Private"]
-# For OpenRouter, select provider, model, dimensions and route for your endpoint.
-# allow_cloud = true
-# route = "provider-slug"
-# key_env = "OPENROUTER_API_KEY"
+# allowed_mime_types = ["text/markdown", "text/plain"]
+# related_min_score = 0.0
+# See docs/semantic-search.md for provider settings.
+# url = "http://127.0.0.1:11434" # Ollama
+# base_url = "https://example.com/v1" # OpenAI-compatible server
+# request_dimensions = false # OpenAI-compatible server or LM Studio
+# route = "provider-slug" # OpenRouter
+# zdr = true # OpenRouter
+# data_collection = "deny" # OpenRouter
+# key_env = "EMBEDDING_API_KEY"
+# allow_cloud = false
 # usd_per_million_tokens = "0.10" # Replace with the current price for the selected route.
+# daily_budget_usd = "0.50"
+# usd_per_attachment_unit = { "image/png" = "0.01", "application/pdf" = "0.01" }
 # profile_version = "1" # Change when you replace a model under the same name.

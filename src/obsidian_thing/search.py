@@ -7,22 +7,29 @@ from collections.abc import Callable, Iterable
 from contextlib import closing
 from hashlib import sha256
 from itertools import islice
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from threading import Lock
 from typing import NotRequired, TypedDict
 
 from .embeddings import Embedder, EmbeddingError
 from .index_policy import IndexPolicy
-from .search_chunks import Chunk, chunks
+from .metrics import Metrics
+from .search_attachments import ATTACHMENT_LIMIT, SUFFIX_TYPES, TEXT_TYPES, attachment_parts, mime_type
+from .search_chunks import Chunk, chunks, section_lines
 from .vault import TextFile, Vault, VaultError, _parts
 
 
-class Match(TypedDict):
-    path: str
+class SectionMatch(TypedDict):
     score: float
-    headings: list[str]
-    line_start: int
-    line_end: int
+    headings: NotRequired[list[str]]
+    line_start: NotRequired[int]
+    line_end: NotRequired[int]
+    page: NotRequired[int]
+
+
+class Match(SectionMatch):
+    path: str
+    sections: NotRequired[list[SectionMatch]]
 
 
 class Matches(TypedDict):
@@ -30,10 +37,20 @@ class Matches(TypedDict):
     vector_unavailable: NotRequired[bool]
 
 
+def _attachment_revision(stamp: str, data: bytes) -> str:
+    return f'{stamp}:{sha256(data).hexdigest()}'
+
+
 def _scope(config: dict, key: str) -> list[tuple[str, ...]]:
-    paths = config.get(key, [])
+    try:
+        return _path_prefixes(config.get(key, []))
+    except VaultError:
+        raise ValueError(f'Configure embedding {key} as a list of vault-relative paths') from None
+
+
+def _path_prefixes(paths: list[str]) -> list[tuple[str, ...]]:
     if not isinstance(paths, list) or not all(isinstance(path, str) for path in paths):
-        raise ValueError(f'Configure embedding {key} as a list of paths')
+        raise VaultError('Use a list of vault-relative paths')
     return [() if path == '.' else _parts(path) for path in paths]
 
 
@@ -56,17 +73,29 @@ class SearchIndex:
     chunk_size = 1500
     max_chunks = 32
 
-    def __init__(self, vault: Vault, config: dict, state: Path, *, indexing: object = None):
+    def __init__(self, vault: Vault, config: dict, state: Path, *, indexing: object = None, vectors: bool = True,
+                 metrics: Metrics | None = None):
+        self.metrics = metrics
         self.vault = vault
         self.policy = indexing if isinstance(indexing, IndexPolicy) else IndexPolicy(vault, {} if indexing is None else indexing)
-        self.include = _scope(config, 'include_paths')
-        self.exclude = _scope(config, 'exclude_paths')
+        self.include = _scope(config, 'include_paths') if vectors else []
+        self.exclude = _scope(config, 'exclude_paths') if vectors else []
         self.section_chunks = config.get('section_chunks', True)
         if not isinstance(self.section_chunks, bool):
             raise ValueError('Configure embedding section_chunks as a boolean')
-        if config.get('provider') == 'openrouter' and not self.include:
-            raise ValueError('Configure include_paths before you send files to OpenRouter')
-        self.embedder = Embedder(config, state)
+        threshold = config.get('related_min_score', 0.0) if vectors else 0.0
+        if type(threshold) not in (int, float) or not -1 <= threshold <= 1:
+            raise ValueError('Configure related_min_score between -1 and 1')
+        self.related_min_score: float = threshold
+        self.embedder = Embedder(config, state, metrics=metrics) if vectors else None
+        types = config.get('allowed_mime_types', list(TEXT_TYPES)) if vectors else []
+        if not isinstance(types, list) or not all(isinstance(t, str) and t in SUFFIX_TYPES.values() for t in types):
+            raise ValueError('Configure allowed_mime_types as a list of supported MIME types')
+        self.allowed_mime_types = frozenset(types)
+        if self.embedder and any(not self.embedder.supports_attachment(t) for t in self.allowed_mime_types - TEXT_TYPES):
+            raise ValueError('The configured embedding route does not support an allowed attachment type')
+        if self.embedder and not self.embedder.local and self.embedder.can_send and not self.include:
+            raise ValueError('Configure include_paths before you send files to a remote embedding endpoint')
         self.database = state / 'search.sqlite3'
         self.embedding_lock_path = state / 'embedding.lock'
         self.run_lock_path = state / 'embedding-run.lock'
@@ -110,7 +139,7 @@ class SearchIndex:
 
     @staticmethod
     def _supports_text(path: str) -> bool:
-        return PurePosixPath(path).suffix.lower() in ('.md', '.txt')
+        return mime_type(path) in TEXT_TYPES
 
     def _check_local_path(self, path: str) -> None:
         self.vault._allowed_parts(path)
@@ -118,37 +147,69 @@ class SearchIndex:
         if not self._supports_text(path):
             raise VaultError('Only Markdown and plain text paths can use this index')
 
-    def _check_path(self, path: str) -> None:
-        self._check_local_path(path)
+    def _check_path(self, path: str) -> str:
+        self.vault._allowed_parts(path)
+        self.policy.check(path)
+        mime = mime_type(path)
+        if mime is None or mime not in self.allowed_mime_types:
+            raise VaultError('This file type is not enabled for embeddings')
         parts = _parts(path)
         if self.include and not any(parts[:len(prefix)] == prefix for prefix in self.include):
             raise VaultError('The path is outside the embedding scope')
         if any(parts[:len(prefix)] == prefix for prefix in self.exclude):
             raise VaultError('The path is excluded from embeddings')
+        return mime
+
+    def _index_text(self, db: sqlite3.Connection, path: str,
+                    queued_revision: str | None) -> tuple[str, list[Chunk]]:
+        note = self.vault.read(path)
+        revision = note['revision']
+        if queued_revision is not None and revision != queued_revision:
+            raise VaultError('The queued revision is no longer current')
+        fragments = self._fragments(note)
+        with self.local_lock:
+            self._index_lexical(db, path, revision, fragments)
+        return revision, fragments
 
     def index(self, path: str, *, operation: str = 'index', queued_revision: str | None = None,
               stop: Callable[[], bool] | None = None) -> dict[str, str | int]:
-        self._check_path(path)
-        profile = self.embedder.profile
+        embedder = self.embedder
+        if embedder is None:
+            self._check_local_path(path)
+            with closing(sqlite3.connect(self.database)) as db:
+                revision, fragments = self._index_text(db, path, queued_revision)
+            return {'path': path, 'revision': revision, 'chunks': len(fragments)}
+        mime = self._check_path(path)
+        if mime not in TEXT_TYPES and not embedder.can_send:
+            raise EmbeddingError('Set allow_cloud = true to send input to a remote embedding endpoint')
+        profile = embedder.profile
         with self.index_lock, self.embedding_lock_path.open('ab') as lease, closing(sqlite3.connect(self.database)) as db:
             fcntl.flock(lease, fcntl.LOCK_EX)
-            note = self.vault.read(path)
-            revision = note['revision']
-            if queued_revision is not None and revision != queued_revision:
-                raise VaultError('The queued revision is no longer current')
-            fragments = self._fragments(note)
-            with self.local_lock:
-                self._index_lexical(db, path, revision, fragments)
-            digests = [sha256(chunk.text.encode()).hexdigest() for chunk in fragments]
-            hashes = {digest: chunk.text for digest, chunk in zip(digests, fragments, strict=True)}
-            for digest, chunk in hashes.items():
+            if mime in TEXT_TYPES:
+                revision, fragments = self._index_text(db, path, queued_revision)
+                payloads = [chunk.text for chunk in fragments]
+                locations = [(json.dumps(c.headings), c.line_start, c.line_end) for c in fragments]
+            else:
+                stamp, data = self.vault.read_attachment(path, ATTACHMENT_LIMIT)
+                revision = _attachment_revision(stamp, data)
+                if queued_revision is not None and revision != queued_revision:
+                    raise VaultError('The queued revision is no longer current')
+                payloads = list(attachment_parts(mime, data))
+                locations = [('[]', None, None)] * len(payloads)
+            digests = [sha256(p.encode() if isinstance(p, str) else f'attachment-v1:{mime}:'.encode() + p).hexdigest()
+                       for p in payloads]
+            for digest, payload in dict(zip(digests, payloads, strict=True)).items():
                 if stop is not None and stop():
                     raise VaultError('Background indexing stopped')
-                if not db.execute('SELECT 1 FROM vectors WHERE profile = ? AND hash = ?',
-                                  (profile, digest)).fetchone():
+                cached = db.execute('SELECT 1 FROM vectors WHERE profile = ? AND hash = ?',
+                                    (profile, digest)).fetchone() is not None
+                if self.metrics is not None:
+                    self.metrics.cache.labels('hit' if cached else 'miss').inc()
+                if not cached:
                     if not self._is_current(path, revision):
                         raise VaultError('The file changed or left the index scope during indexing')
-                    vector = self.embedder.embed(chunk, operation)
+                    vector = (embedder.embed(payload, operation) if isinstance(payload, str)
+                              else embedder.embed_attachment(mime, payload, operation))
                     with db:
                         db.execute('INSERT OR IGNORE INTO vectors VALUES (?, ?, ?)',
                                    (profile, digest, json.dumps(vector)))
@@ -158,26 +219,43 @@ class SearchIndex:
                 db.execute('DELETE FROM section_chunks WHERE profile = ? AND mode = ? AND path = ?',
                            (profile, self.section_chunks, path))
                 db.executemany('INSERT INTO section_chunks VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', (
-                    (profile, self.section_chunks, path, revision, digest, ordinal,
-                     json.dumps(chunk.headings), chunk.line_start, chunk.line_end)
-                    for ordinal, (digest, chunk) in enumerate(zip(digests, fragments, strict=True))
+                    (profile, self.section_chunks, path, revision, digest, ordinal, *location)
+                    for ordinal, (digest, location) in enumerate(zip(digests, locations, strict=True))
                 ))
+                if mime not in TEXT_TYPES:
+                    db.execute('INSERT OR REPLACE INTO local_files VALUES (?, ?, ?)',
+                               (self.section_chunks, path, revision))
                 db.execute('INSERT OR REPLACE INTO embedded_files VALUES (?, ?, ?, ?)',
                            (profile, self.section_chunks, path, revision))
-        return {'path': path, 'revision': revision, 'chunks': len(fragments)}
+        return {'path': path, 'revision': revision, 'chunks': len(payloads)}
+
+    _pending_rows = '''
+        SELECT l.path, l.revision FROM local_files AS l
+        WHERE l.mode = ? AND NOT EXISTS (
+            SELECT 1 FROM embedded_files AS e WHERE e.profile = ? AND e.mode = l.mode
+            AND e.path = l.path AND e.revision = l.revision
+        )
+    '''
+
+    def queue_depth(self) -> int:
+        if self.embedder is None or not self.embedder.can_send:
+            return 0
+        with closing(sqlite3.connect(self.database)) as db:
+            count, = db.execute(f'SELECT count(*) FROM ({self._pending_rows})',
+                                (self.section_chunks, self.embedder.profile)).fetchone()
+        return count
 
     def pending(self) -> list[tuple[str, str]]:
+        if self.embedder is None or not self.embedder.can_send:
+            return []
         with closing(sqlite3.connect(self.database)) as db:
-            rows = db.execute('''
-                SELECT l.path, l.revision FROM local_files AS l
-                WHERE l.mode = ? AND NOT EXISTS (
-                    SELECT 1 FROM embedded_files AS e WHERE e.profile = ? AND e.mode = l.mode
-                    AND e.path = l.path AND e.revision = l.revision
-                ) ORDER BY l.path
-            ''', (self.section_chunks, self.embedder.profile)).fetchall()
+            rows = db.execute(self._pending_rows + ' ORDER BY l.path',
+                              (self.section_chunks, self.embedder.profile)).fetchall()
         return [(path, revision) for path, revision in rows if self._is_current(path, revision)]
 
     def run_pending(self, *, stop: Callable[[], bool] | None = None) -> bool:
+        if self.embedder is None:
+            return True
         with self.run_lock_path.open('ab') as lease:
             try:
                 fcntl.flock(lease, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -204,6 +282,7 @@ class SearchIndex:
 
     def reconcile_local(self, paths: Iterable[str] | None = None, *,
                         stop: Callable[[], bool] | None = None) -> dict[str, str]:
+        full_scan = paths is None
         with closing(sqlite3.connect(self.database)) as db:
             if paths is None:
                 visible = set(self.vault.visible_files())
@@ -219,6 +298,29 @@ class SearchIndex:
                     break
                 if not self._supports_text(path):
                     self.vault.graph.refresh(path)
+                    if self.embedder is None or not self.embedder.can_send:
+                        continue
+                    with self.local_lock:
+                        try:
+                            mime = self._check_path(path)
+                            stamp = self.vault.attachment_stamp(path, ATTACHMENT_LIMIT)
+                            row = db.execute('SELECT revision FROM local_files WHERE mode = ? AND path = ?',
+                                             (self.section_chunks, path)).fetchone()
+                            if not full_scan and row and row[0].partition(':')[0] == stamp:
+                                revisions[path] = row[0]
+                                continue
+                            stamp, data = self.vault.read_attachment(path, ATTACHMENT_LIMIT)
+                            revision = _attachment_revision(stamp, data)
+                            if not row or row[0] != revision:
+                                for _ in attachment_parts(mime, data):
+                                    pass
+                                self._drop_path(db, path)
+                                with db:
+                                    db.execute('INSERT INTO local_files VALUES (?, ?, ?)',
+                                               (self.section_chunks, path, revision))
+                            revisions[path] = revision
+                        except VaultError:
+                            self._drop_path(db, path)
                     continue
                 with self.local_lock:
                     try:
@@ -272,33 +374,74 @@ class SearchIndex:
         if not 1 <= limit <= self.max_results:
             raise VaultError(f'Use a result limit between 1 and {self.max_results}')
 
-    def related(self, path: str, limit: int, min_score: float) -> Matches:
+    def related(self, path: str, limit: int, min_score: float | None = None, *,
+                section_line: int | None = None, include_paths: list[str] | None = None,
+                mime_types: list[str] | None = None, exclude_linked: bool = False) -> Matches:
+        if self.embedder is None:
+            raise VaultError('Enable embeddings to find related files')
         self._validate_limit(limit)
-        if not -1 <= min_score <= 1:
+        threshold = self.related_min_score if min_score is None else min_score
+        if type(threshold) not in (int, float) or not -1 <= threshold <= 1:
             raise VaultError('Use a similarity threshold between -1 and 1')
-        self.index(path, operation='related')
+        prefixes = None if include_paths is None else _path_prefixes(include_paths)
+        if mime_types is not None and any(mime not in SUFFIX_TYPES.values() for mime in mime_types):
+            raise VaultError('Use supported MIME types for related results')
+        mime = self._check_path(path)
+        bounds = None
+        expected_revision = None
+        if section_line is not None:
+            if mime != 'text/markdown' or not self.section_chunks:
+                raise VaultError('Select a line in a Markdown note with section chunks enabled')
+            note = self.vault.read(path)
+            bounds = section_lines(note['content'], section_line)
+            if bounds is None:
+                raise VaultError('Select a line in a Markdown section outside frontmatter')
+            expected_revision = note['revision']
+        excluded = {path}
+        if exclude_linked and mime == 'text/markdown':
+            excluded.update(edge['resolved'][0] for edge in self.vault.graph.outgoing(path)
+                            if len(edge['resolved']) == 1)
+        source = self.index(path, operation='related', queued_revision=expected_revision)
         with closing(sqlite3.connect(self.database)) as db:
-            vectors = [json.loads(row[0]) for row in db.execute('''
+            vectors = [json.loads(packed) for packed, in db.execute('''
                 SELECT DISTINCT vector FROM section_chunks JOIN vectors USING (profile, hash)
-                WHERE profile = ? AND mode = ? AND path = ?
-            ''', (self.embedder.profile, self.section_chunks, path))]
-        return self._match(vectors, limit, min_score, exclude=path)
+                WHERE profile = ? AND mode = ? AND path = ? AND revision = ?
+                  AND (? IS NULL OR (line_end >= ? AND line_start <= ?))
+            ''', (self.embedder.profile, self.section_chunks, path, source['revision'],
+                  *((None, None, None) if bounds is None else (bounds[0], *bounds))))]
+        if not self._is_current(path, str(source['revision'])):
+            raise VaultError('The source changed during related search; try again')
+
+        def accepts(candidate: str) -> bool:
+            if candidate in excluded or (mime_types is not None and mime_type(candidate) not in mime_types):
+                return False
+            if prefixes is None:
+                return True
+            parts = _parts(candidate)
+            return any(parts[:len(prefix)] == prefix for prefix in prefixes)
+
+        return self._match(self.embedder.profile, vectors, limit, threshold, accepts=accepts, group_sections=True)
 
     def query(self, text: str, limit: int) -> Matches:
         self._validate_limit(limit)
         if not text.strip() or len(text) > self.chunk_size or '\0' in text:
             raise VaultError('Use a short non-empty text query without NUL characters')
+        if self.embedder is None:
+            return {'matches': _merge_ranks(self._lexical(text, limit))}
         try:
             vectors = [self.embedder.embed(text, 'query')]
         except EmbeddingError:
             return {'matches': _merge_ranks(self._lexical(text, limit)), 'vector_unavailable': True}
         lexical = self._lexical(text, self.max_results)
-        semantic = self._match(vectors, self.max_results, -1)['matches']
+        semantic = self._match(self.embedder.profile, vectors, self.max_results, -1)['matches']
         return {'matches': _merge_ranks(lexical, semantic)[:limit]}
 
     def _is_current(self, path: str, revision: str, *, local: bool = False) -> bool:
         try:
-            (self._check_local_path if local else self._check_path)(path)
+            if local:
+                self._check_local_path(path)
+            elif self._check_path(path) not in TEXT_TYPES:
+                return self.vault.attachment_stamp(path, ATTACHMENT_LIMIT) == revision.partition(':')[0]
             return self.vault.read(path)['revision'] == revision
         except VaultError:
             return False
@@ -327,30 +470,45 @@ class SearchIndex:
                     break
         return hits
 
-    def _match(self, vectors: list[list[float]], limit: int, min_score: float,
-               *, exclude: str | None = None) -> Matches:
+    def _match(self, profile: str, vectors: list[list[float]], limit: int, min_score: float,
+               *, accepts: Callable[[str], bool] | None = None, group_sections: bool = False) -> Matches:
         if not vectors:
             return {'matches': []}
         best: dict[tuple[str, str], Match] = {}
+        sections: dict[tuple[str, str], list[SectionMatch]] = {}
         with closing(sqlite3.connect(self.database)) as db:
-            for path, revision, packed, headings, start, end in db.execute('''
-                SELECT path, revision, vector, headings, line_start, line_end
+            for path, revision, packed, headings, start, end, ordinal in db.execute('''
+                SELECT path, revision, vector, headings, line_start, line_end, ordinal
                 FROM section_chunks JOIN vectors USING (profile, hash)
                 WHERE profile = ? AND mode = ? ORDER BY path, ordinal
-            ''', (self.embedder.profile, self.section_chunks)):
-                if path == exclude:
+            ''', (profile, self.section_chunks)):
+                if accepts is not None and not accepts(path):
                     continue
                 vector = json.loads(packed)
                 score = max(math.fsum(x * y for x, y in zip(source, vector, strict=True)) for source in vectors)
                 key = path, revision
                 score = max(-1, min(1, score))
-                if key not in best or score > best[key]['score']:
-                    best[key] = {'path': path, 'score': score, 'headings': json.loads(headings),
-                                 'line_start': start, 'line_end': end}
+                if score < min_score:
+                    continue
+                is_best = key not in best or score > best[key]['score']
+                if not group_sections and not is_best:
+                    continue
+                location: SectionMatch = {'score': score}
+                if start is not None:
+                    location.update(headings=json.loads(headings), line_start=start, line_end=end)
+                elif mime_type(path) == 'application/pdf':
+                    location['page'] = ordinal + 1
+                if group_sections and ('line_start' in location or 'page' in location):
+                    sections.setdefault(key, []).append(location)
+                if is_best:
+                    best[key] = {**location, 'path': path}
         hits: list[Match] = []
         for (path, revision), hit in sorted(best.items(), key=lambda item: (-item[1]['score'], item[0][0])):
-            if len(hits) == limit or hit['score'] < min_score:
+            if len(hits) == limit:
                 break
             if self._is_current(path, revision):
+                locations = sections.get((path, revision))
+                if locations:
+                    hit['sections'] = sorted(locations, key=lambda item: -item['score'])
                 hits.append(hit)
         return {'matches': hits}

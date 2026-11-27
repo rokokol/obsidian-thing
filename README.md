@@ -63,7 +63,7 @@ Enable embeddings per vault with the settings in [`config.example.toml`](config.
 
 Call `obsidian.index` to index one Markdown or plain-text file. Use `obsidian.query` for a text query or `obsidian.related` for neighbors of a note. `obsidian.related` indexes the source if needed, but searches only indexed files. The server skips deleted and outdated results. You can enable [automatic updates to the local index](docs/semantic-search.md#automatic-local-index-updates)
 
-Ollama requires a loopback endpoint in the server's network namespace. OpenRouter sends text to a cloud provider only when you set `allow_cloud = true` and specify `include_paths`. The vault token then permits indexing within those paths and sending text queries. The request selects one route and requires zero data retention, denies data collection, and disables fallback
+Use [Ollama, LM Studio, OpenRouter, or an OpenAI-compatible endpoint](docs/semantic-search.md#embedding-providers) for embeddings. Remote requests require explicit permission
 
 Read `<state_dir>/spend.sqlite3` to inspect provider calls. The journal does not store input text, file paths, or keys. `reported` is a price returned by the provider. `estimated` uses the configured rate and the provider's token count. `unknown` means no usable price, and `local` means no API charge is tracked
 

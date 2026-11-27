@@ -188,6 +188,37 @@ class Vault:
         except OSError:
             raise VaultError('The file does not exist or is not accessible') from None
 
+    @staticmethod
+    def _binary_stamp(fd: int, limit: int) -> str:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode):
+            raise VaultError('The path must name a regular file')
+        if not 0 < info.st_size <= limit:
+            raise VaultError('The attachment is empty or exceeds the size limit')
+        stamp = (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+        return sha256(repr(stamp).encode('ascii')).hexdigest()
+
+    def attachment_stamp(self, path: str, limit: int) -> str:
+        try:
+            with self._open(self._allowed_parts(path)) as fd:
+                return self._binary_stamp(fd, limit)
+        except OSError:
+            raise VaultError('The attachment does not exist or is not accessible') from None
+
+    def read_attachment(self, path: str, limit: int) -> tuple[str, bytes]:
+        try:
+            with self._open(self._allowed_parts(path)) as fd:
+                stamp = self._binary_stamp(fd, limit)
+                with os.fdopen(fd, 'rb', closefd=False) as file:
+                    data = file.read(limit + 1)
+                if len(data) > limit or self._binary_stamp(fd, limit) != stamp:
+                    raise VaultError('The attachment changed during indexing')
+        except OSError:
+            raise VaultError('The attachment does not exist or is not accessible') from None
+        if self.attachment_stamp(path, limit) != stamp:
+            raise VaultError('The attachment changed during indexing')
+        return stamp, data
+
     def stat(self, path: str) -> FileInfo:
         parts = self._read_parts(path)
         try:

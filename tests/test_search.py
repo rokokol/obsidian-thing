@@ -13,6 +13,25 @@ from obsidian_thing.server import create_app
 from obsidian_thing.vault import Vault, VaultError
 
 
+def test_remote_note_opt_in_requires_explicit_scope(tmp_path, monkeypatch):
+    root = tmp_path / 'vault'
+    root.mkdir()
+    (root / 'note.md').write_text('synthetic note')
+    vault = Vault(root, ['.'])
+    config = dict(provider='openai', base_url='https://example.com/v1', model='test', dimensions=2)
+    with pytest.raises(ValueError, match='include_paths'):
+        SearchIndex(vault, config | {'allow_cloud': True}, tmp_path)
+    index = SearchIndex(vault, config, tmp_path)
+    assert index.embedder is not None
+    monkeypatch.setattr(index.embedder.http, 'open', lambda *args, **kwargs: pytest.fail('Unexpected HTTP request'))
+    with pytest.raises(EmbeddingError, match='allow_cloud'):
+        index.index('note.md')
+    assert index.pending() == []
+    result = index.query('synthetic', 10)
+    assert result.get('vector_unavailable') is True
+    assert [hit['path'] for hit in result['matches']] == ['note.md']
+
+
 def test_local_reconciliation_detects_same_size_and_mtime_and_never_embeds(tmp_path, monkeypatch):
     root = tmp_path / 'vault'
     root.mkdir()
@@ -114,7 +133,7 @@ def test_query_combines_exact_and_semantic_matches_and_falls_back(tmp_path, monk
         index.index(path)
     matches = index.query('section_chunks', 2)['matches']
     assert [item['path'] for item in matches] == ['z-exact.md', 'a-semantic.md']
-    assert matches[0]['headings'] == ['Setup'] and matches[0]['line_start'] == 3
+    assert matches[0].get('headings') == ['Setup'] and matches[0].get('line_start') == 3
 
     def offline(self, text, operation):
         raise EmbeddingError('offline')
@@ -171,7 +190,7 @@ def test_index_embeds_section_context_and_returns_best_location(tmp_path, monkey
     assert len(flat_payloads) == 2
     assert all('pediatric' in text and 'do not send' not in text for text in flat_payloads)
     flat_hit, = flat.query('target', 5)['matches']
-    assert flat_hit['headings'] == [] and flat_hit['line_end'] == 17
+    assert flat_hit.get('headings') == [] and flat_hit.get('line_end') == 17
     assert index.query('target', 5)['matches'] == [hit]
 
 
@@ -193,6 +212,7 @@ def test_index_reuses_vectors_and_hides_stale_or_excluded_paths(tmp_path, monkey
 
     index = SearchIndex(Vault(root, ['.']), dict(provider='ollama', model='synthetic',
                         dimensions=2, exclude_paths=['excluded.md']), state)
+    assert index.embedder is not None
     monkeypatch.setattr(index.embedder.http, 'open', respond)
     for path in ('excluded.md', 'picture.png', '../secrets.md'):
         with pytest.raises(VaultError):
@@ -247,6 +267,74 @@ def test_index_and_search_enforce_the_current_vault_allowlist(tmp_path, monkeypa
     assert calls == [('query', 'query')]
 
 
+def test_narrowed_embedding_scope_hides_existing_vectors_and_skips_queue(tmp_path, monkeypatch):
+    root = tmp_path / 'vault'
+    root.mkdir()
+    for name in ('keep', 'private'):
+        (root / 'notes' / name).mkdir(parents=True)
+        (root / 'notes' / name / 'note.md').write_text('orchard')
+    (root / 'outside.md').write_text('orchard')
+    sent = []
+
+    def embed(self, text, operation):
+        sent.append((text, operation))
+        return [1.0, 0.0]
+
+    monkeypatch.setattr(Embedder, 'embed', embed)
+    vault = Vault(root, ['.'])
+    config = dict(provider='ollama', model='synthetic', dimensions=2)
+    original = SearchIndex(vault, config, tmp_path)
+    original.reconcile_local()
+    assert original.run_pending()
+    keep, private, outside = 'notes/keep/note.md', 'notes/private/note.md', 'outside.md'
+    changed = SearchIndex(vault, config | {'include_paths': ['notes'], 'exclude_paths': ['notes/private']}, tmp_path)
+    assert [hit['path'] for hit in changed.query('unmatched', 10)['matches']] == [keep]
+    for path in (keep, private, outside):
+        (root / path).write_text('garden ' + path)
+    changed.reconcile_local()
+    assert [path for path, _ in changed.pending()] == [keep]
+    sent.clear()
+    assert changed.run_pending()
+    assert sent == [('garden ' + keep, 'background')]
+    assert {hit['path'] for hit in changed.query('garden', 10)['matches']} == {keep, private, outside}
+
+
+def test_related_resolves_repeated_headings_and_groups_matches(tmp_path, monkeypatch):
+    root = tmp_path / 'vault'
+    root.mkdir()
+    (root / 'notes').mkdir()
+    files = {
+        'source.md': '# Topic\nPear [[notes/linked]]\n\n# Topic\nApple\n',
+        'notes/linked.md': 'Apple', 'notes/pear.md': 'Pear',
+        'notes/match.md': '# One\nApple\n\n# Two\nApple too\n',
+        'notes/skip.txt': 'Apple', 'outside.md': 'Apple',
+    }
+    for path, content in files.items():
+        (root / path).write_text(content)
+    calls = []
+
+    def embed(self, text, operation):
+        calls.append(text)
+        return [0.0, 1.0] if 'Pear' in text else [1.0, 0.0]
+
+    monkeypatch.setattr(Embedder, 'embed', embed)
+    config = dict(provider='ollama', model='synthetic', dimensions=2, related_min_score=0.5)
+    index = SearchIndex(Vault(root, ['.']), config, tmp_path)
+    for path in files.keys() - {'source.md'}:
+        index.index(path)
+    calls.clear()
+    with pytest.raises(VaultError, match='line'):
+        index.related('source.md', 10, section_line=99)
+    assert not calls
+    hits = index.related('source.md', 10, section_line=4, include_paths=['notes'],
+                         mime_types=['text/markdown'], exclude_linked=True)['matches']
+    assert [hit['path'] for hit in hits] == ['notes/match.md']
+    assert [(item.get('headings'), item.get('line_start')) for item in hits[0].get('sections', [])] == [(['One'], 2), (['Two'], 5)]
+    assert [hit['path'] for hit in index.related('source.md', 10, section_line=1)['matches']] == ['notes/pear.md']
+    assert len(index.related('source.md', 1, min_score=-1)['matches']) == 1
+    assert len(index.related('source.md', 10, min_score=-1)['matches']) == 5
+
+
 def test_search_tools_use_the_authenticated_vault(tmp_path, monkeypatch):
     root = tmp_path / 'vault'
     root.mkdir()
@@ -272,3 +360,10 @@ def test_search_tools_use_the_authenticated_vault(tmp_path, monkeypatch):
         assert call('obsidian.index', {'path': 'note.md'})['chunks'] == 1
         assert call('obsidian.query', {'text': 'related text'}) == {'matches': [{'path': 'note.md', 'score': 1.0, 'headings': [], 'line_start': 1, 'line_end': 1}]}
         assert call('obsidian.related', {'path': 'note.md'}) == {'matches': []}
+        (root / 'other.md').write_text('# Topic\nother\n')
+        call('obsidian.index', {'path': 'other.md'})
+        related = call('obsidian.related', {'path': 'note.md', 'section_line': 1,
+                       'include_paths': ['other.md'], 'mime_types': ['text/markdown'], 'exclude_linked': True})
+        assert related == {'matches': [{'path': 'other.md', 'score': 1.0, 'headings': ['Topic'],
+                           'line_start': 2, 'line_end': 2, 'sections': [{'score': 1.0, 'headings': ['Topic'],
+                           'line_start': 2, 'line_end': 2}]}]}

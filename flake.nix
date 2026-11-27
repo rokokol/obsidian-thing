@@ -38,9 +38,18 @@
               pkgs.python3Packages.markdown-it-py
               pkgs.python3Packages.mcp
               pkgs.python3Packages.mdit-py-plugins
+              pkgs.python3Packages.pillow
+              pkgs.python3Packages.pypdf
+              pkgs.python3Packages.prometheus-client
               pkgs.python3Packages.ruamel-yaml
               pkgs.python3Packages.starlette
               pkgs.python3Packages.uvicorn
+            ];
+            makeWrapperArgs = [
+              "--prefix"
+              "PATH"
+              ":"
+              (lib.makeBinPath [ pkgs.ffmpeg-headless ])
             ];
             pythonImportsCheck = [ "obsidian_thing.server" ];
             meta = {
@@ -68,6 +77,7 @@
         default = pkgs.mkShell {
           packages = [
             pkgs.actionlint
+            pkgs.ffmpeg-headless
             pkgs.pyright
             pkgs.python3
             pkgs.uv

@@ -7,10 +7,11 @@ from pathlib import Path
 from mcp.server import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.applications import Starlette
 from starlette.datastructures import Headers
 from starlette.responses import Response
-from starlette.routing import Mount
+from starlette.routing import Mount, Route
 from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.concurrency import run_in_threadpool
 
@@ -23,6 +24,7 @@ from .graph import Attachment, Backlinks, Edge
 from .iconic import IconChanges, IconResult, set_icon
 from .index_policy import IndexPolicy
 from .index_watcher import IndexWatcher
+from .metrics import Metrics
 from .rules import KNOWN_CHECKS, QUOTE_KEYS, _quote_pair
 from .search import Matches, SearchIndex
 from .structured_documents import BaseChange, CanvasChange
@@ -183,30 +185,38 @@ def vault_server(
                 return vault.delete(path, expected_revision, trash_dir)
 
     if search is not None:
+        vectors = search.embedder is not None
+
         @server.tool(name='obsidian.index', description=(
-            'Index one Markdown (.md) or plain text (.txt) file inside the embedding scope. '
-            'Attachments, PDF and audio files are not indexed yet. May call the configured provider.'
+            'Index one Markdown (.md) or plain text (.txt) file.'
+            + (' Index an attachment if its MIME type is enabled. '
+               'The embedding scope applies. This tool can call the provider.' if vectors else '')
         ))
         def index(path: str) -> dict[str, str | int]:
             with _tool_errors():
                 return search.index(path)
 
         @server.tool(name='obsidian.query', description=(
-            'Search indexed Markdown and plain text with FTS5 and embeddings. '
-            'If the embedding provider fails, return text matches and set vector_unavailable. '
-            'Search only current files in the index. Vector results also require the embedding scope.'
+            'Search current Markdown and plain text files in the full-text index.'
+            + (' Include vector results from the embedding scope. '
+               'If the provider fails, return text matches and set vector_unavailable.' if vectors else '')
         ))
         def query(text: str, limit: int = 10) -> Matches:
             with _tool_errors():
                 return search.query(text, limit)
 
-        @server.tool(name='obsidian.related', description=(
-            'Find indexed Markdown or plain text neighbors of a Markdown or plain text file. '
-            'Index its current revision if needed.'
-        ))
-        def related(path: str, limit: int = 10, min_score: float = 0.0) -> Matches:
-            with _tool_errors():
-                return search.related(path, limit, min_score)
+        if vectors:
+            @server.tool(name='obsidian.related', description=(
+                'Find indexed neighbors of a text file or an enabled attachment. '
+                'Index its current revision if needed. Select a Markdown section with its one-based line number. '
+                'Filter results by vault-relative paths, MIME types, or outgoing links.'
+            ))
+            def related(path: str, limit: int = 10, min_score: float | None = None, section_line: int | None = None,
+                        include_paths: list[str] | None = None, mime_types: list[str] | None = None,
+                        exclude_linked: bool = False) -> Matches:
+                with _tool_errors():
+                    return search.related(path, limit, min_score, section_line=section_line, include_paths=include_paths,
+                                          mime_types=mime_types, exclude_linked=exclude_linked)
 
     return server
 
@@ -264,7 +274,23 @@ def create_app(config: dict) -> Starlette:
     )
     if not isinstance(config.get('vaults'), dict) or not config['vaults']:
         raise ValueError('Configure at least one vault')
-    routes = []
+    routes: list[Route | Mount] = []
+    metrics = None
+    metrics_token = None
+    if 'metrics_token_env' in config:
+        env = config['metrics_token_env']
+        metrics_token = os.environ.get(env, '') if isinstance(env, str) else ''
+        if not re.fullmatch(r'[a-zA-Z0-9._~+/=-]+', metrics_token):
+            raise ValueError('Set a valid bearer token for metrics_token_env')
+        metrics = Metrics()
+        registry = metrics.registry
+
+        async def scrape(scope: Scope, receive: Receive, send: Send) -> None:
+            payload = await run_in_threadpool(generate_latest, registry)
+            response = Response(payload, headers={'Content-Type': CONTENT_TYPE_LATEST, 'Cache-Control': 'no-store'})
+            await response(scope, receive, send)
+
+        routes.append(Route('/metrics', RequireBearer(scrape, metrics_token), methods=['GET']))
     servers = []
     watchers: list[IndexWatcher] = []
     schedules: list[EmbeddingSchedule] = []
@@ -280,6 +306,8 @@ def create_app(config: dict) -> Starlette:
         bearer = os.environ.get(env, '')
         if not re.fullmatch(r'[a-zA-Z0-9._~+/=-]+', bearer):
             raise ValueError(f'Set a valid bearer token in {env}')
+        if metrics_token is not None and compare_digest(metrics_token, bearer):
+            raise ValueError('Use a different bearer token for metrics and vault access')
         allowed = settings['allowed']
         if not isinstance(allowed, list) or not all(isinstance(path, str) for path in allowed):
             raise ValueError('Configure allowed paths as a list of strings')
@@ -323,18 +351,21 @@ def create_app(config: dict) -> Starlette:
             if not trash_dir.is_dir() or trash_dir in trash_dirs:
                 raise ValueError('Configure a separate trash directory for each vault')
             trash_dirs.add(trash_dir)
-        embeddings = settings.get('embeddings')
+        embeddings = settings.get('embeddings', {})
+        if not isinstance(embeddings, dict):
+            raise ValueError('Configure embeddings as a table')
+        vectors = embeddings.get('enabled', 'embeddings' in settings)
+        if not isinstance(vectors, bool):
+            raise ValueError('Configure embeddings.enabled as a boolean')
         state = None
-        if 'embeddings' in settings:
-            if not isinstance(embeddings, dict):
-                raise ValueError('Configure embeddings as a table')
+        if vectors or 'state_dir' in embeddings:
             state = _state_dir(embeddings)
             if any(_overlap(state, other) for other in state_dirs):
                 raise ValueError('Configure separate embedding state directories for each vault')
             state_dirs.append(state)
         if policy.auto and state is None:
             raise ValueError('Automatic indexing needs an embeddings state directory')
-        mounted.append((name, bearer, vault, writable, trash_dir, embeddings, state, integrations, policy))
+        mounted.append((name, bearer, vault, writable, trash_dir, embeddings, state, integrations, policy, vectors))
 
     if any(_overlap(trash, root) for trash in trash_dirs for root in roots):
         raise ValueError('The trash and vault directories must not overlap')
@@ -345,16 +376,22 @@ def create_app(config: dict) -> Starlette:
            for directory in (*roots, *trash_dirs, *state_dirs)):
         raise ValueError('Keep checker scripts outside vaults, trash and embedding state')
 
-    for name, token, vault, writable, trash_dir, embeddings, state, integrations, policy in mounted:
-        search = SearchIndex(vault, embeddings, state, indexing=policy) if state is not None else None
+    for name, token, vault, writable, trash_dir, embeddings, state, integrations, policy, vectors in mounted:
+        search = (SearchIndex(vault, embeddings, state, indexing=policy, vectors=vectors, metrics=metrics)
+                  if state is not None else None)
         if search is not None:
+            if vectors and metrics is not None:
+                metrics.queue_sources.append(search.queue_depth)
             if policy.auto:
                 watchers.append(IndexWatcher(search))
-            schedule = EmbeddingSchedule(search, embeddings)
-            if schedule.enabled:
-                schedules.append(schedule)
+            if vectors:
+                schedule = EmbeddingSchedule(search, embeddings)
+                if schedule.enabled:
+                    schedules.append(schedule)
         server = vault_server(name, vault, writable=writable, trash_dir=trash_dir, search=search,
                               iconic_offline=integrations['iconic_offline'], fsrs_dictionary=integrations['fsrs_dictionary'])
+        if metrics is not None:
+            server.middleware.append(metrics.observe_mcp)
         app = server.streamable_http_app(stateless_http=True, json_response=True, transport_security=security)
         routes.append(Mount(f'/vaults/{name}', app=RequireBearer(app, token)))
         servers.append(server)

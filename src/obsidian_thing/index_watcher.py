@@ -34,7 +34,11 @@ class IndexWatcher:
     def _reconcile(self, paths: set[str] | None = None) -> None:
         try:
             self.index.reconcile_local(paths, stop=self.stopping.is_set)
+            if self.index.metrics is not None and paths is None and not self.stopping.is_set():
+                self.index.metrics.last_scan.set_to_current_time()
         except (OSError, sqlite3.Error):
+            if self.index.metrics is not None:
+                self.index.metrics.scan_errors.labels('full' if paths is None else 'partial').inc()
             _log.warning('Vault index reconciliation failed; the next full scan will retry')
 
     def _run(self) -> None:

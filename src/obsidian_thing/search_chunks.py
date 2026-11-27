@@ -87,7 +87,7 @@ def _fixed(text: str, size: int) -> Iterator[tuple[str, int, int]]:
             yield fragment, left, left + len(fragment)
 
 
-def chunks(content: str, size: int, *, markdown: bool, sections: bool) -> Iterator[Chunk]:
+def _source(content: str, markdown: bool) -> tuple[str, int, str]:
     text = content.replace('\r\n', '\n').replace('\r', '\n').removeprefix('\ufeff')
     properties = ''
     frontmatter_lines = 0
@@ -97,6 +97,22 @@ def chunks(content: str, size: int, *, markdown: bool, sections: bool) -> Iterat
             properties = _properties(text)
             frontmatter_lines = text.count('\n', 0, span[2]) + 1
             text = text[span[2]:].removeprefix('\n')
+    return text, frontmatter_lines, properties
+
+
+def section_lines(content: str, line: int) -> tuple[int, int] | None:
+    text, offset, _ = _source(content, True)
+    if not offset < line <= offset + len(text.splitlines()):
+        return None
+    for _, _, end, anchor in _sections(text, True):
+        first, last = offset + anchor + 1, offset + end
+        if first <= line <= last:
+            return first, last
+    return None
+
+
+def chunks(content: str, size: int, *, markdown: bool, sections: bool) -> Iterator[Chunk]:
+    text, frontmatter_lines, properties = _source(content, markdown)
     offsets = [0, *(match.end() for match in re.finditer('\n', text)), len(text)]
     emitted = False
     split = _paragraphs if markdown and sections else _fixed

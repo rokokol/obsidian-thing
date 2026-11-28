@@ -152,7 +152,15 @@
 
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShell {
-          LD_LIBRARY_PATH = lib.makeLibraryPath (with pkgs; [ cairo ]);
+          # cairosvg loads Cairo through ctypes, and uv brings its own interpreter, so the
+          # library search path is the dev shell's job; libstdc++ stays because numpy needs it
+          LD_LIBRARY_PATH = lib.makeLibraryPath (
+            with pkgs;
+            [
+              cairo
+              stdenv.cc.cc.lib
+            ]
+          );
           packages = with pkgs; [
             actionlint
             ffmpeg-headless

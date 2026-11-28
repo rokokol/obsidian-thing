@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## [0.1.0] - 2026-11-28
 
 ### Changed
 
@@ -43,11 +43,7 @@
 - Draw a file and its nearest neighbors on two axes with `obsidian.map`. The tool keeps the vector rank and requires the plugin client header
 - Name every tool and the configuration that offers it in one reference, with a page for every configuration key and a guide to deployment
 - Publish a project site at `obsidian-thing.rokokol.art`: a bilingual overview, the tool reference, a short guide and a cover card for social previews
-
-## [0.1.0] - 2026-11-19
-
-### Added
-
 - Read vault files and instructions through MCP Streamable HTTP
 - Set an access token and allowed paths for each vault
 - Run the server as a native Nix package or in Docker
+

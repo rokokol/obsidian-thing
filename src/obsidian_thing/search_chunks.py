@@ -18,6 +18,7 @@ class Chunk:
     headings: tuple[str, ...]
     line_start: int
     line_end: int
+    words: int = 0
 
 
 def _properties(text: str) -> str:
@@ -116,21 +117,17 @@ def chunks(content: str, size: int, *, markdown: bool, sections: bool) -> Iterat
     offsets = [0, *(match.end() for match in re.finditer('\n', text)), len(text)]
     emitted = False
     split = _paragraphs if markdown and sections else _fixed
-    for headings, start, end, anchor in _sections(text, markdown and sections):
+    for headings, start, end, _ in _sections(text, markdown and sections):
         trail = ' > '.join(headings)[:320]
         context = '\n'.join(part for part in (trail, properties) if part)
         prefix = context + '\n\n' if context else ''
         start_offset = offsets[start]
         body = text[start_offset:offsets[end]]
-        found = False
         for fragment, left, right in split(body, size - len(prefix)):
-            found = emitted = True
+            emitted = True
             yield Chunk(prefix + fragment, headings,
                         frontmatter_lines + bisect_right(offsets, start_offset + left),
-                        frontmatter_lines + bisect_right(offsets, start_offset + right - 1))
-        if headings and not found:
-            emitted = True
-            line = frontmatter_lines + anchor + 1
-            yield Chunk(context, headings, line, line)
+                        frontmatter_lines + bisect_right(offsets, start_offset + right - 1),
+                        len(fragment.split()))
     if properties and not emitted:
         yield Chunk(properties, (), 1, frontmatter_lines)

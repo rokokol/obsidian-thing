@@ -42,7 +42,7 @@ def test_metrics_count_provider_calls_cache_and_mcp_errors(tmp_path, monkeypatch
     config = {'metrics_token_env': 'METRICS_TOKEN', 'vaults': {'private-vault': {
         'root': str(vault), 'allowed': ['.'], 'token_env': 'VAULT_TOKEN',
         'embeddings': {'provider': 'openai', 'base_url': 'https://provider.example/v1', 'model': 'private-model',
-                       'state_dir': str(state), 'allow_cloud': True, 'include_paths': ['.'], 'dimensions': 2},
+                       'state_dir': str(state), 'allow_cloud': True, 'include_paths': ['.'], 'dimensions': 2, 'min_chunk_words': 0},
     }}}
     replies = iter([{'id': 'private-id', 'data': [{'embedding': [1, 0]}], 'usage': {'cost': 0.25}}, None,
                     {'data': [{'embedding': [1, 0]}]}])
@@ -95,7 +95,7 @@ def test_queue_snapshot_and_full_scan_timestamp(tmp_path, monkeypatch):
     state = tmp_path / 'state'
     state.mkdir()
     metrics = Metrics()
-    search = SearchIndex(Vault(root, ['.']), dict(provider='ollama', model='test', dimensions=2), state, metrics=metrics)
+    search = SearchIndex(Vault(root, ['.']), dict(provider='ollama', model='test', dimensions=2, min_chunk_words=0), state, metrics=metrics)
     metrics.queue_sources.append(search.queue_depth)
     watcher = IndexWatcher(search)
     registry = metrics.registry

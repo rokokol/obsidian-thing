@@ -20,7 +20,7 @@ def _index(tmp_path, monkeypatch, *, files, embeddings=None, indexing=None, vect
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content)
     monkeypatch.setattr(Embedder, 'embed', _embed)
-    config = dict(provider='ollama', model=model, dimensions=2, state_dir=str(state),
+    config = dict(provider='ollama', model=model, dimensions=2, min_chunk_words=0, state_dir=str(state),
                   section_chunks=section_chunks)
     index = SearchIndex(Vault(root, ['.']), (embeddings or {}) | config, state,
                         indexing=indexing or {}, vectors=vectors)
@@ -109,7 +109,7 @@ def test_a_stopped_full_scan_keeps_the_previous_snapshot(tmp_path, monkeypatch):
 def test_snapshot_is_isolated_by_split_mode(tmp_path, monkeypatch):
     root, state, sections = _index(tmp_path, monkeypatch, files={'note.md': 'word'})
     sizes = SearchIndex(sections.vault, dict(
-        provider='ollama', model='synthetic', dimensions=2, state_dir=str(state), section_chunks=False), state)
+        provider='ollama', model='synthetic', dimensions=2, min_chunk_words=0, state_dir=str(state), section_chunks=False), state)
     sections.reconcile_local()
     sizes.reconcile_local()
     assert sections.status()['index']['mode'] == 'sections'
@@ -129,7 +129,7 @@ def test_snapshot_is_isolated_by_embedding_profile(tmp_path, monkeypatch):
     assert (first.status()['index']['files'], first.status()['index']['embedded']) == (1, 1)
 
     second = SearchIndex(Vault(root, ['.']), dict(
-        provider='ollama', model='second', dimensions=2, state_dir=str(state)), state)
+        provider='ollama', model='second', dimensions=2, min_chunk_words=0, state_dir=str(state)), state)
     unknown = second.status()['index']
     assert unknown['files'] is None
     assert unknown['embedded'] is None

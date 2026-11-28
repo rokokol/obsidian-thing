@@ -38,7 +38,7 @@ def _index(tmp_path, monkeypatch, *, embeddings=None, files=None, indexing=None,
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content)
     monkeypatch.setattr(Embedder, 'embed', _embed)
-    config = dict(provider='ollama', model='synthetic', dimensions=3, state_dir=str(state))
+    config = dict(provider='ollama', model='synthetic', dimensions=3, min_chunk_words=0, state_dir=str(state))
     index = SearchIndex(Vault(root, ['.']), (embeddings or {}) | config, state,
                         indexing=indexing or {}, vectors=vectors)
     return root, state, index
@@ -195,7 +195,7 @@ def endpoint(tmp_path, monkeypatch):
     monkeypatch.setenv('TEST_STATUS_TOKEN', 'synthetic-token')
     monkeypatch.setattr(Embedder, 'embed', lambda self, text, operation: [1.0, 0.0, 0.0])
     settings = dict(root=str(root), allowed=['.'], token_env='TEST_STATUS_TOKEN',
-                    embeddings=dict(provider='ollama', model='synthetic', dimensions=3, state_dir=str(state)))
+                    embeddings=dict(provider='ollama', model='synthetic', dimensions=3, min_chunk_words=0, state_dir=str(state)))
     return {'vaults': {'notes': settings}}, settings
 
 
@@ -286,7 +286,7 @@ def test_map_keeps_the_source_whose_chunks_cancel_out(tmp_path, monkeypatch):
     state.mkdir(mode=0o700)
     (root / 'source.md').write_text('# One\n\nplus\n\n# Two\n\nminus\n')
     (root / 'near.md').write_text('plus too')
-    index = SearchIndex(Vault(root, ['.']), dict(provider='ollama', model='synthetic', dimensions=3,
+    index = SearchIndex(Vault(root, ['.']), dict(provider='ollama', model='synthetic', dimensions=3, min_chunk_words=0,
                         state_dir=str(state)), state)
     index.index('near.md')
     points = index.map('source.md', 10, -1)['points']
@@ -303,7 +303,7 @@ def test_map_compares_mean_directions_not_vector_sums(tmp_path, monkeypatch):
     state.mkdir(mode=0o700)
     (root / 'source.md').write_text('# One\n\nnear\n\n# Two\n\nnear\n')
     (root / 'near.md').write_text('near')
-    index = SearchIndex(Vault(root, ['.']), dict(provider='ollama', model='synthetic', dimensions=3,
+    index = SearchIndex(Vault(root, ['.']), dict(provider='ollama', model='synthetic', dimensions=3, min_chunk_words=0,
                         state_dir=str(state)), state)
     index.index('near.md')
     points = index.map('source.md', 10, -1)['points']

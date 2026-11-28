@@ -26,7 +26,7 @@ def test_queue_survives_restart_and_only_sends_current_uncached_fragments(tmp_pa
         return [1.0, 0.0]
 
     monkeypatch.setattr(Embedder, 'embed', embed)
-    config = dict(provider='ollama', model='synthetic', dimensions=2, background=True)
+    config = dict(provider='ollama', model='synthetic', dimensions=2, min_chunk_words=0, background=True)
     def open_index():
         return SearchIndex(Vault(root, ['.']), config, state, indexing={'respect_gitignore': True})
 
@@ -79,7 +79,7 @@ def test_bulk_directory_move_reuses_vectors_and_updates_paths(tmp_path: Path, mo
 
     monkeypatch.setattr(Embedder, 'embed', embed)
     vault = Vault(root, ['.'])
-    index = SearchIndex(vault, dict(provider='ollama', model='synthetic', dimensions=2), state)
+    index = SearchIndex(vault, dict(provider='ollama', model='synthetic', dimensions=2, min_chunk_words=0), state)
     index.reconcile_local()
     assert index.run_pending()
     assert calls.count('background') == count + 1
@@ -106,7 +106,7 @@ def test_queue_retains_failed_work_and_manual_index_drains_it(tmp_path: Path, mo
     state = tmp_path / 'state'
     state.mkdir(mode=0o700)
     (root / 'note.md').write_text('text')
-    config = dict(provider='ollama', model='synthetic', dimensions=2)
+    config = dict(provider='ollama', model='synthetic', dimensions=2, min_chunk_words=0)
     index = SearchIndex(Vault(root, ['.']), config, state)
     index.reconcile_local()
 
@@ -133,7 +133,7 @@ def test_manual_index_writes_when_background_scan_holds_sqlite_transaction(tmp_p
     state.mkdir(mode=0o700)
     (root / 'manual.md').write_text('manual text')
     (root / 'scan.md').write_text('scan text')
-    config = dict(provider='ollama', model='synthetic', dimensions=2)
+    config = dict(provider='ollama', model='synthetic', dimensions=2, min_chunk_words=0)
     manual = SearchIndex(Vault(root, ['.']), config, state)
     background = SearchIndex(Vault(root, ['.']), config, state)
     provider_started = Event()
@@ -202,7 +202,7 @@ def test_http_lifespan_runs_enabled_schedule(tmp_path: Path, monkeypatch):
 
     monkeypatch.setattr(EmbeddingSchedule, 'next_run', trigger_once)
     monkeypatch.setattr(Embedder, 'embed', embed)
-    embeddings = dict(provider='ollama', model='synthetic', dimensions=2, background=True, state_dir=str(state))
+    embeddings = dict(provider='ollama', model='synthetic', dimensions=2, min_chunk_words=0, background=True, state_dir=str(state))
     app = create_app({'vaults': {'queue': dict(root=str(root), allowed=['.'], token_env='TEST_QUEUE_TOKEN',
                                                 embeddings=embeddings)}})
     with TestClient(app, base_url='http://localhost'):

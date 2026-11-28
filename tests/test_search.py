@@ -18,7 +18,7 @@ def test_remote_note_opt_in_requires_explicit_scope(tmp_path, monkeypatch):
     root.mkdir()
     (root / 'note.md').write_text('synthetic note')
     vault = Vault(root, ['.'])
-    config = dict(provider='openai', base_url='https://example.com/v1', model='test', dimensions=2)
+    config = dict(provider='openai', base_url='https://example.com/v1', model='test', dimensions=2, min_chunk_words=0)
     with pytest.raises(ValueError, match='include_paths'):
         SearchIndex(vault, config | {'allow_cloud': True}, tmp_path)
     index = SearchIndex(vault, config, tmp_path)
@@ -49,7 +49,7 @@ def test_local_reconciliation_detects_same_size_and_mtime_and_never_embeds(tmp_p
 
     monkeypatch.setattr(Embedder, 'embed', offline)
     vault = Vault(root, ['.'])
-    index = SearchIndex(vault, dict(provider='ollama', model='synthetic', dimensions=2,
+    index = SearchIndex(vault, dict(provider='ollama', model='synthetic', dimensions=2, min_chunk_words=0,
                         exclude_paths=['private.md']), state, indexing={'exclude': ['*.tmp.md']})
     index.reconcile_local()
     assert calls == []
@@ -84,7 +84,7 @@ def test_indexing_exclusions_apply_to_explicit_tools_and_old_results(tmp_path, m
     (root / '.gitignore').write_text('tree/\n!tree/keep.md\n')
     (root / 'nested' / '.gitignore').write_text('*.md\n!show.md\n')
     vault = Vault(root, ['.'])
-    config = dict(provider='ollama', model='synthetic', dimensions=2)
+    config = dict(provider='ollama', model='synthetic', dimensions=2, min_chunk_words=0)
     calls = []
 
     def embed(self, text, operation):
@@ -127,7 +127,7 @@ def test_query_combines_exact_and_semantic_matches_and_falls_back(tmp_path, monk
         return [0.0, 1.0]
 
     monkeypatch.setattr(Embedder, 'embed', embed)
-    config = dict(provider='ollama', model='synthetic', dimensions=2)
+    config = dict(provider='ollama', model='synthetic', dimensions=2, min_chunk_words=0)
     index = SearchIndex(Vault(root, ['.']), config, state)
     for path in ('z-exact.md', 'a-semantic.md', 'partial.md'):
         index.index(path)
@@ -169,7 +169,7 @@ def test_index_embeds_section_context_and_returns_best_location(tmp_path, monkey
         return [0.0, 1.0] if 'target' in text else [1.0, 0.0]
 
     monkeypatch.setattr(Embedder, 'embed', embed)
-    config = dict(provider='ollama', model='synthetic', dimensions=2)
+    config = dict(provider='ollama', model='synthetic', dimensions=2, min_chunk_words=0)
     vault = Vault(root, ['.'])
     index = SearchIndex(vault, config, state)
     index.index('note.md')
@@ -211,7 +211,7 @@ def test_index_reuses_vectors_and_hides_stale_or_excluded_paths(tmp_path, monkey
         return BytesIO(json.dumps({'embeddings': [vector]}).encode())
 
     index = SearchIndex(Vault(root, ['.']), dict(provider='ollama', model='synthetic',
-                        dimensions=2, exclude_paths=['excluded.md']), state)
+                        dimensions=2, min_chunk_words=0, exclude_paths=['excluded.md']), state)
     assert index.embedder is not None
     monkeypatch.setattr(index.embedder.http, 'open', respond)
     for path in ('excluded.md', 'picture.png', '../secrets.md'):
@@ -247,7 +247,7 @@ def test_index_and_search_enforce_the_current_vault_allowlist(tmp_path, monkeypa
         return [1.0, 0.0]
 
     monkeypatch.setattr(Embedder, 'embed', embed)
-    config = dict(provider='ollama', model='synthetic', dimensions=2)
+    config = dict(provider='ollama', model='synthetic', dimensions=2, min_chunk_words=0)
     original = SearchIndex(Vault(root, ['.']), config, state)
     for name in ('allowed.md', 'revoked.md', 'replacement.md'):
         original.index(name)
@@ -282,7 +282,7 @@ def test_narrowed_embedding_scope_hides_existing_vectors_and_skips_queue(tmp_pat
 
     monkeypatch.setattr(Embedder, 'embed', embed)
     vault = Vault(root, ['.'])
-    config = dict(provider='ollama', model='synthetic', dimensions=2)
+    config = dict(provider='ollama', model='synthetic', dimensions=2, min_chunk_words=0)
     original = SearchIndex(vault, config, tmp_path)
     original.reconcile_local()
     assert original.run_pending()
@@ -318,7 +318,7 @@ def test_related_resolves_repeated_headings_and_groups_matches(tmp_path, monkeyp
         return [0.0, 1.0] if 'Pear' in text else [1.0, 0.0]
 
     monkeypatch.setattr(Embedder, 'embed', embed)
-    config = dict(provider='ollama', model='synthetic', dimensions=2, related_min_score=0.5)
+    config = dict(provider='ollama', model='synthetic', dimensions=2, min_chunk_words=0, related_min_score=0.5)
     index = SearchIndex(Vault(root, ['.']), config, tmp_path)
     for path in files.keys() - {'source.md'}:
         index.index(path)
@@ -344,7 +344,7 @@ def test_search_tools_use_the_authenticated_vault(tmp_path, monkeypatch):
     monkeypatch.setenv('TEST_SEARCH_TOKEN', 'synthetic-token')
     monkeypatch.setattr(Embedder, 'embed', lambda self, text, operation: [1.0, 0.0])
     config = {'vaults': {'notes': dict(root=str(root), allowed=['.'], token_env='TEST_SEARCH_TOKEN',
-              embeddings=dict(provider='ollama', model='synthetic', dimensions=2, state_dir=str(state)))}}
+              embeddings=dict(provider='ollama', model='synthetic', dimensions=2, min_chunk_words=0, state_dir=str(state)))}}
     app = create_app(config)
     url = '/vaults/notes/mcp'
     headers = {'Authorization': 'Bearer synthetic-token', 'Accept': 'application/json, text/event-stream',

@@ -73,6 +73,7 @@ class IndexStatus(TypedDict):
 
 
 class EmbeddingStatus(EmbeddingDescription):
+    min_chunk_words: int
     related_min_score: float
     allowed_mime_types: list[str]
 
@@ -133,6 +134,10 @@ class SearchIndex:
         self.section_chunks = config.get('section_chunks', True)
         if not isinstance(self.section_chunks, bool):
             raise ValueError('Configure embedding section_chunks as a boolean')
+        words = config.get('min_chunk_words', 8)
+        if type(words) is not int or not 0 <= words <= 1000:
+            raise ValueError('Configure embedding min_chunk_words as an integer from 0 to 1000')
+        self.min_chunk_words: int = words
         threshold = config.get('related_min_score', 0.0) if vectors else 0.0
         if type(threshold) not in (int, float) or not -1 <= threshold <= 1:
             raise ValueError('Configure related_min_score between -1 and 1')
@@ -257,8 +262,9 @@ class SearchIndex:
             fcntl.flock(lease, fcntl.LOCK_EX)
             if mime in TEXT_TYPES:
                 revision, fragments = self._index_text(db, path, queued_revision)
-                payloads = [chunk.text for chunk in fragments]
-                locations = [(json.dumps(c.headings), c.line_start, c.line_end) for c in fragments]
+                embedded = [chunk for chunk in fragments if chunk.words >= self.min_chunk_words]
+                payloads = [chunk.text for chunk in embedded]
+                locations = [(json.dumps(c.headings), c.line_start, c.line_end) for c in embedded]
             else:
                 stamp, data = self.vault.read_attachment(path, ATTACHMENT_LIMIT)
                 revision = _attachment_revision(stamp, data)
@@ -555,6 +561,7 @@ class SearchIndex:
         if self.embedder is not None:
             report['embeddings'] = {
                 **self.embedder.description(),
+                'min_chunk_words': self.min_chunk_words,
                 'related_min_score': self.related_min_score,
                 'allowed_mime_types': sorted(self.allowed_mime_types),
             }

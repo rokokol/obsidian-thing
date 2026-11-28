@@ -57,6 +57,7 @@ writable = false
 # background = false
 # schedule = "0 3 * * *" # UTC
 # section_chunks = true # Set false to split by size instead of headings and paragraphs.
+# min_chunk_words = 8 # Keep shorter section bodies out of the vector index. 0 indexes every fragment.
 # include_paths = ["Notes"]
 # exclude_paths = ["Notes/Private"]
 # allowed_mime_types = ["text/markdown", "text/plain"]

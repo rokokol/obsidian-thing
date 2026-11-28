@@ -124,6 +124,8 @@
             ];
             meta = {
               description = "MCP server for local Obsidian vaults";
+              homepage = "https://github.com/rokokol/obsidian-thing";
+              license = lib.licenses.mit;
               mainProgram = "obsidian-thing";
               platforms = systems;
             };

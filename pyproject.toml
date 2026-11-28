@@ -5,6 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "obsidian-thing"
 dynamic = ["version"]
+license = "MIT"
 requires-python = ">=3.11"
 dependencies = ["mcp>=2.3,<3", "starlette>=0.40,<2", "uvicorn>=0.31,<1", "ruamel.yaml>=0.19,<0.20", "markdown-it-py>=4,<5", "mdit-py-plugins>=0.5,<1", "pathspec>=0.12,<2", "pillow>=11,<14", "pypdf>=5,<8", "numpy>=2,<3", "regex>=2026.9.29", "prometheus-client>=0.20,<1", "croniter>=6,<7", "inotify-simple>=2,<3; sys_platform == 'linux'"]
 
@@ -22,4 +23,4 @@ path = "VERSION"
 pattern = '(?P<version>\S+)'
 
 [tool.hatch.build.targets.sdist]
-only-include = ["src", "tests", "docs", "examples", "pyproject.toml", "uv.lock", "VERSION", "README.md", "config.example.toml"]
+only-include = ["src", "tests", "docs", "examples", "pyproject.toml", "uv.lock", "VERSION", "README.md", "LICENSE", "config.example.toml"]

@@ -3,7 +3,10 @@ from functools import lru_cache
 
 from pathspec import GitIgnoreSpec
 
-from .vault import Vault, VaultError, _parts
+from .excalidraw import has_drawing_marker
+from .frontmatter import frontmatter_nodes
+from .fsrs import DICTIONARY_PROPERTY
+from .vault import TextFile, Vault, VaultError, _parts
 
 
 class ExclusionError(VaultError):
@@ -52,6 +55,18 @@ class IndexPolicy:
             raise VaultError('Cannot read the indexing ignore rules') from None
         except ValueError:
             raise VaultError('Cannot parse the indexing ignore rules') from None
+
+    @staticmethod
+    def check_note(note: TextFile) -> None:
+        if not note['path'].lower().endswith('.md'):
+            return
+        _, root = frontmatter_nodes(note['content'])
+        if root is None:
+            return
+        if has_drawing_marker(root):
+            raise ExclusionError('Excalidraw drawings are excluded from indexing')
+        if any(key.value == DICTIONARY_PROPERTY for key, _ in root.value):
+            raise ExclusionError('FSRS Vocabulary dictionaries are excluded from indexing')
 
     def check(self, path: str) -> None:
         parts = _parts(path)

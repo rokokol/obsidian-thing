@@ -14,6 +14,7 @@ from ruamel.yaml.nodes import MappingNode, Node, ScalarNode
 from .frontmatter import frontmatter_nodes
 from .vault import MutationResult, Vault, VaultError, _parts
 
+DICTIONARY_PROPERTY = 'fsrs-vocabulary'
 _PLUGIN = '.obsidian/plugins/fsrs-vocabulary'
 _HISTORY_FILE = re.compile(r'history-(desktop|mobile)-[a-z0-9]+(?:\.[^/]*)?\.jsonl')
 _CARD_ID = re.compile(r'[a-z0-9]{1,32}')
@@ -118,7 +119,7 @@ def _get(mapping: MappingNode, key: str) -> Node | None:
 
 def _dictionary_config(text: str) -> tuple[bool, bool]:
     _, root = frontmatter_nodes(text)
-    config = _get(root, 'fsrs-vocabulary') if root is not None else None
+    config = _get(root, DICTIONARY_PROPERTY) if root is not None else None
     muted = _get(config, 'mute') if isinstance(config, MappingNode) else None
     return config is not None, isinstance(muted, ScalarNode) and muted.value.lower() == 'true'
 

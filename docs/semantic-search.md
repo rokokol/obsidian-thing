@@ -136,7 +136,7 @@ The tool needs an embedding profile. A vault with only full-text search does not
 |---|---|
 | `index.mode` | `sections` or `size`, the split that the index holds |
 | `index.files` | Visible files the index will consider: after the access, MIME, embedding scope and read-size rules |
-| `index.excluded` | Files that `indexing.exclude` or a `.gitignore` rule removes |
+| `index.excluded` | Files that an index policy excludes |
 | `index.indexed` | Files with an entry in the local full-text index; a note edited since the last scan still counts until a scan catches it |
 | `index.unindexed` | Candidate files with no entry yet |
 | `index.embedded` | Files with vectors for the current profile and split; a file with no vectors does not count |
@@ -155,6 +155,8 @@ The server adds reported and estimated prices separately and returns them as dec
 Set `indexing.exclude` per vault to replace the default patterns `*.tmp`, `*.swp`, and `*~`. Patterns use `.gitignore` syntax relative to the vault root. An empty list disables these patterns. Hidden paths, including `.git`, and symlinks remain outside the index
 
 Set `indexing.respect_gitignore = true` to also use `.gitignore` files from the vault root and its subdirectories. Nested files and `!` patterns apply. A negation cannot restore a file under an ignored directory. The server ignores symlinked `.gitignore` files. It does not use global Git rules or `.git/info/exclude`
+
+The index also excludes Markdown drawings with `excalidraw-plugin: parsed` or `raw`, and dictionaries with the `fsrs-vocabulary` property. These exclusions apply even when the related integrations are off. The index does not support standalone `.excalidraw` files
 
 These rules apply to explicit `obsidian.index` and `obsidian.related` calls, as well as search results. They do not change vault read access or link resolution. If a rule excludes a path after indexing, search hides its old entries without waiting for a new index operation
 

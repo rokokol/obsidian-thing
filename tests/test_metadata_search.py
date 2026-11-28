@@ -54,6 +54,29 @@ def test_find_ignores_code_and_rejects_stale_or_revoked_hits(tmp_path):
     assert restricted.find(tags=['new']) == {'paths': []}
 
 
+@pytest.mark.parametrize('marker', ['excalidraw-plugin: parsed', 'fsrs-vocabulary: {}'])
+def test_plugin_notes_leave_search_but_stay_readable(tmp_path, marker):
+    root = tmp_path / 'vault'
+    root.mkdir()
+    note = root / 'custom-name.md'
+    note.write_text('needle #project')
+    vault = Vault(root, ['.'])
+    index = SearchIndex(vault, {}, tmp_path, vectors=False)
+    index.reconcile_local()
+    assert index.find(tags=['project']) == {'paths': ['custom-name.md']}
+    note.write_text(f'---\n{marker}\n---\nneedle #project')
+    with pytest.raises(VaultError, match='excluded'):
+        index.index('custom-name.md')
+    index.reconcile_local()
+    assert index.query('needle', 5) == {'matches': []}
+    assert index.find(tags=['project']) == {'paths': []}
+    assert index.status()['index']['excluded'] == 1
+    with sqlite3.connect(index.database) as db:
+        assert db.execute('SELECT path FROM local_files').fetchall() == []
+        assert db.execute('SELECT path FROM lexical_chunks').fetchall() == []
+    assert marker in vault.read('custom-name.md')['content']
+
+
 def test_reconciliation_backfills_metadata_for_an_unchanged_note(tmp_path):
     root = tmp_path / 'vault'
     root.mkdir()

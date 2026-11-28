@@ -225,6 +225,7 @@ class SearchIndex:
     def _index_text(self, db: sqlite3.Connection, path: str,
                     queued_revision: str | None) -> tuple[str, list[Chunk]]:
         note = self.vault.read(path)
+        self.policy.check_note(note)
         revision = note['revision']
         if queued_revision is not None and revision != queued_revision:
             raise VaultError('The queued revision is no longer current')
@@ -409,10 +410,16 @@ class SearchIndex:
                     self.vault.graph.refresh(path, note)
                     try:
                         self._check_local_path(path)
+                        self.policy.check_note(note)
                         revision = note['revision']
                         if not self._lexical_is_current(db, path, revision):
                             self._index_lexical(db, note, self._fragments(note))
                         revisions[path] = revision
+                    except ExclusionError:
+                        if path in candidates:
+                            candidates.remove(path)
+                            excluded += 1
+                        self._drop_path(db, path)
                     except VaultError:
                         self._drop_path(db, path)
             if full_scan and completed:
@@ -737,7 +744,11 @@ class SearchIndex:
                 self._check_local_path(path)
             elif self._check_path(path) not in TEXT_TYPES:
                 return self.vault.attachment_stamp(path, ATTACHMENT_LIMIT) == revision.partition(':')[0]
-            return self.vault.read(path)['revision'] == revision
+            note = self.vault.read(path)
+            if note['revision'] != revision:
+                return False
+            self.policy.check_note(note)
+            return True
         except VaultError:
             return False
 

@@ -131,8 +131,9 @@ The `embeddings` table creates the search index. A vault without the table offer
 | `dimensions` | required with `enabled` | From 1 to 8192. A vector of another size is refused |
 | `profile_version` | absent | Change it when you replace a model under the same name |
 | `section_chunks` | `true` | Split Markdown at headings. `false` splits by size alone |
-| `min_chunk_words` | `8` | From 0 to 1000. A shorter fragment stays out of the vector index |
+| `min_chunk_words` | `24` | From 0 to 1000. A shorter fragment stays out of the vector index |
 | `related_min_score` | `0.0` | The default threshold of `obsidian.related`, from −1 to 1 |
+| `max_pdf_pages` | `16` | From 1 to 2000. A PDF with more pages is refused, and each page is one provider request |
 | `include_paths` | every allowed path | The vault-relative paths that embeddings may cover |
 | `exclude_paths` | empty | Paths that embeddings never cover. They win over `include_paths` |
 | `allowed_mime_types` | `text/markdown`, `text/plain` | The file types the index may send |

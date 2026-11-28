@@ -54,14 +54,24 @@ def _parts(path: str, *, obsidian: bool = False) -> tuple[str, ...]:
     return parts
 
 
+def _agent_path(path: str) -> tuple[str, ...]:
+    parts = tuple(path.split('/'))
+    if (not path or path.startswith('/') or '\\' in path or '\0' in path
+            or any(part in ('', '.', '..') for part in parts)):
+        raise VaultError('Configure an agent directory as a relative path with plain names')
+    return parts
+
+
 class Vault:
     max_read_bytes = 1_048_576
 
     def __init__(self, root: Path, allowed: list[str], *, checker: Checker | None = None,
                  protect_frontmatter: bool = False, checks: dict[str, object] | None = None,
                  read_obsidian: bool = True, canvas: bool = True, bases: bool = True,
-                 media_gallery: bool = False):
+                 media_gallery: bool = False, agent_dirs: list[str] | None = None):
         from .graph import LinkGraph
+
+        self.agent_roots = [_agent_path(path) for path in agent_dirs or []]
 
         self.canvas = canvas
         self.bases = bases
@@ -152,6 +162,67 @@ class Vault:
             raise VaultError('The path is not allowed')
         return parts
 
+    def _agent_parts(self, path: str) -> tuple[str, ...]:
+        parts = _agent_path(path)
+        for root in self.agent_roots:
+            if parts[:len(root)] == root and not any(part.startswith('.') for part in parts[len(root):]):
+                return parts
+        raise VaultError('The path is outside the agent directories')
+
+    def agent_entries(self, path: str) -> list[tuple[str, bool, bool]]:
+        parts = self._agent_parts(path)
+        try:
+            with self._directory(parts) as fd:
+                found = []
+                for name in os.listdir(fd):
+                    if name.startswith('.'):
+                        continue
+                    try:
+                        info = os.stat(name, dir_fd=fd, follow_symlinks=False)
+                    except FileNotFoundError:
+                        continue
+                    is_dir = stat.S_ISDIR(info.st_mode)
+                    is_file = stat.S_ISREG(info.st_mode)
+                    if is_dir or is_file:
+                        found.append((name, is_dir, is_file))
+                return sorted(found)
+        except FileNotFoundError:
+            return []
+        except OSError:
+            raise VaultError('Cannot read the agent directory') from None
+
+    def ensure_agent_dir(self, path: str) -> None:
+        parts = self._agent_parts(path)
+        flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY
+        try:
+            with self._mutation_lock:
+                fd = os.open(self.root, flags)
+                try:
+                    for name in parts:
+                        try:
+                            child = os.open(name, flags, dir_fd=fd)
+                        except FileNotFoundError:
+                            os.mkdir(name, 0o700, dir_fd=fd)
+                            child = os.open(name, flags, dir_fd=fd)
+                        os.close(fd)
+                        fd = child
+                finally:
+                    os.close(fd)
+        except OSError:
+            raise VaultError('Cannot create the agent directory') from None
+
+    def agent_read(self, path: str) -> TextFile:
+        parts = self._agent_parts(path)
+        try:
+            with self._open(parts) as fd:
+                note, _ = self._read_text(path, fd)
+                return note
+        except OSError:
+            raise VaultError('The agent file does not exist or is not accessible') from None
+
+    def agent_write(self, path: str, content: str, expected_revision: str | None) -> MutationResult:
+        return self._write(self._agent_parts(path), path, content, expected_revision, note_checks=False)
+
     def _read_text(self, path: str, fd: int) -> tuple[TextFile, int]:
         mode = os.fstat(fd).st_mode
         if not stat.S_ISREG(mode):
@@ -229,7 +300,10 @@ class Vault:
         return {'path': path, 'revision': revision, 'size_bytes': size}
 
     def write(self, path: str, content: str, expected_revision: str | None) -> MutationResult:
-        parts = self._allowed_parts(path)
+        return self._write(self._allowed_parts(path), path, content, expected_revision, note_checks=True)
+
+    def _write(self, parts: tuple[str, ...], path: str, content: str, expected_revision: str | None,
+               *, note_checks: bool) -> MutationResult:
         name = parts[-1]
         try:
             with self._mutation_lock, self._directory(parts[:-1]) as parent:
@@ -245,7 +319,8 @@ class Vault:
                         pass
                     else:
                         raise FileExistsError
-                return self._store(path, parent, name, content, mode, operation='write', before=before)
+                return self._store(path, parent, name, content, mode, operation='write', before=before,
+                                   note_checks=note_checks)
         except FileExistsError:
             raise VaultError('The path already exists; read it before you replace it') from None
         except OSError:
@@ -486,7 +561,7 @@ class Vault:
         return []
 
     def _validate_write(self, path: str, content: str, *, operation: str, before: str | None,
-                        resolver: Resolver | None = None) -> tuple[bytes, list[str]]:
+                        resolver: Resolver | None = None, note_checks: bool = True) -> tuple[bytes, list[str]]:
         if '\0' in content:
             raise VaultError('The content must be UTF-8 text without NUL characters')
         try:
@@ -495,16 +570,17 @@ class Vault:
             raise VaultError('The content must be UTF-8 text') from None
         if len(data) > self.max_read_bytes:
             raise VaultError('The content exceeds the file size limit')
-        enabled = (self.canvas or not path.lower().endswith('.canvas')) and (self.bases or not path.lower().endswith('.base'))
+        enabled = note_checks and (self.canvas or not path.lower().endswith('.canvas')) and (
+            self.bases or not path.lower().endswith('.base'))
         malformed = structured_errors(path, content) if enabled else []
         if malformed:
             raise VaultError('The change would produce an invalid document: ' + '; '.join(malformed[:6]))
         warnings = []
         if self.protect_frontmatter and path.lower().endswith('.md'):
             warnings.extend(self._frontmatter_warnings(before, content))
-        if resolver is None and (self.checker or self.checks.get('broken_links')):
+        if resolver is None and note_checks and (self.checker or self.checks.get('broken_links')):
             resolver = Resolver(self, {path: content})
-        if any(self.checks.values()):
+        if note_checks and any(self.checks.values()):
             errors, found = compare(before, content, path, self.checks, resolver)
             if errors:
                 raise VaultError('The change breaks a vault rule: ' + '; '.join(errors[:6]))
@@ -536,8 +612,9 @@ class Vault:
         return temp
 
     def _store(self, path: str, parent: int, name: str, content: str, mode: int | None,
-               *, operation: str, before: str | None) -> MutationResult:
-        data, warnings = self._validate_write(path, content, operation=operation, before=before)
+               *, operation: str, before: str | None, note_checks: bool = True) -> MutationResult:
+        data, warnings = self._validate_write(path, content, operation=operation, before=before,
+                                              note_checks=note_checks)
         temp = self._stage(parent, data, mode)
         try:
             if mode is None:

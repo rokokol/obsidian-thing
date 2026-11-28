@@ -19,6 +19,8 @@ from starlette.routing import Mount, Route
 from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.concurrency import run_in_threadpool
 
+from .agents import (DEFAULT_INSTRUCTIONS, DEFAULT_MEMORY_DIR, DEFAULT_SKILLS_DIR, Memories, MemoryWrite, Skills,
+                     list_memory, list_skills, read_instructions, read_memory, read_skill, write_memory)
 from .checker import Checker, CheckerError
 from .embedding_schedule import EmbeddingSchedule
 from .embeddings import EmbeddingError
@@ -33,7 +35,7 @@ from .metrics import Metrics
 from .rules import KNOWN_CHECKS, QUOTE_KEYS, _quote_pair
 from .search import Map, Matches, SearchIndex, Status
 from .structured_documents import BaseChange, CanvasChange
-from .vault import FileInfo, MutationResult, RenamedFile, TextFile, TrashedFile, Vault, VaultError
+from .vault import FileInfo, MutationResult, RenamedFile, TextFile, TrashedFile, Vault, VaultError, _parts
 
 
 @contextmanager
@@ -76,18 +78,62 @@ async def _plugin_tools(ctx: ServerRequestContext[Any, Any], call_next: CallNext
 def vault_server(
     name: str, vault: Vault, *, writable: bool = False, trash_dir: Path | None = None,
     search: SearchIndex | None = None, iconic_offline: bool = False, fsrs_dictionary: bool = False,
-    excalidraw: bool = False,
+    excalidraw: bool = False, instructions: list[str] | None = None,
+    skills_dir: str = DEFAULT_SKILLS_DIR, memory_dir: str = DEFAULT_MEMORY_DIR,
 ) -> MCPServer:
+    instructions = instructions or list(DEFAULT_INSTRUCTIONS)
     server = MCPServer(name, middleware=[_plugin_tools])
 
     @server.tool(name='obsidian.allowed', description='List allowed paths relative to this vault.')
     def allowed() -> dict[str, list[str]]:
         return {'paths': vault.allowed}
 
-    @server.tool(name='obsidian.agentsmd', description='Read this vault’s instructions before your first edit.')
+    @server.tool(name='obsidian.agentsmd', description=(
+        'Read this vault’s instructions before your first edit. '
+        'The server returns the first readable file of the configured list.'
+    ))
     def agentsmd() -> TextFile:
         with _tool_errors():
-            return vault.read('AGENTS.md')
+            return read_instructions(vault, instructions)
+
+    @server.tool(name='obsidian.skills_list', description=(
+        'List the vault skills with their names, descriptions and SKILL.md paths.'
+    ))
+    def skills_list() -> Skills:
+        with _tool_errors():
+            return list_skills(vault, skills_dir)
+
+    @server.tool(name='obsidian.skill_read', description=(
+        'Read one vault skill. Omit path to read SKILL.md. '
+        'Pass a path inside the skill directory, such as references/form.md.'
+    ))
+    def skill_read(name: str, path: str = 'SKILL.md') -> TextFile:
+        with _tool_errors():
+            return read_skill(vault, skills_dir, name, path)
+
+    @server.tool(name='obsidian.memory_list', description=(
+        'List vault memory notes with their names, descriptions, types and revisions.'
+    ))
+    def memory_list() -> Memories:
+        with _tool_errors():
+            return list_memory(vault, memory_dir)
+
+    @server.tool(name='obsidian.memory_read', description=(
+        'Read one vault memory note. Pass its name without the extension, or MEMORY.md for the index.'
+    ))
+    def memory_read(name: str) -> TextFile:
+        with _tool_errors():
+            return read_memory(vault, memory_dir, name)
+
+    if writable:
+        @server.tool(name='obsidian.memory_write', description=(
+            'Call obsidian.agentsmd before your first edit. Create or replace a memory note at the revision '
+            'from obsidian.memory_read. The note needs YAML frontmatter with a description. '
+            'The server updates the line of the note in MEMORY.md.'
+        ))
+        def memory_write(name: str, content: str, expected_revision: str | None = None) -> MemoryWrite:
+            with _tool_errors():
+                return write_memory(vault, memory_dir, name, content, expected_revision)
 
     @server.tool(name='obsidian.read', description='Read a UTF-8 text file at a vault-relative path and return its revision.')
     def read(path: str) -> TextFile:
@@ -312,6 +358,26 @@ def _checks(settings: object, writable: bool) -> dict[str, object]:
     return dict(settings)
 
 
+def _agents(settings: dict) -> tuple[list[str], str, str]:
+    agents = settings.get('agents', {})
+    if not isinstance(agents, dict) or set(agents) - {'instructions', 'skills_dir', 'memory_dir'}:
+        raise ValueError('Configure agents as a table of instructions, skills_dir and memory_dir')
+    instructions = agents.get('instructions', list(DEFAULT_INSTRUCTIONS))
+    if (not isinstance(instructions, list) or not instructions
+            or not all(isinstance(name, str) for name in instructions)):
+        raise ValueError('Configure agents.instructions as a list of file names')
+    for name in instructions:
+        try:
+            _parts(name)
+        except VaultError:
+            raise ValueError('Configure agents.instructions as relative paths with plain names') from None
+    skills_dir = agents.get('skills_dir', DEFAULT_SKILLS_DIR)
+    memory_dir = agents.get('memory_dir', DEFAULT_MEMORY_DIR)
+    if not isinstance(skills_dir, str) or not isinstance(memory_dir, str):
+        raise ValueError('Configure agents.skills_dir and agents.memory_dir as strings')
+    return list(instructions), skills_dir, memory_dir
+
+
 def _limited(items: list[str], show_all: bool) -> list[str]:
     limit = 10
     if show_all or len(items) <= limit:
@@ -392,6 +458,7 @@ def create_app(config: dict) -> Starlette:
         if not isinstance(protect_frontmatter, bool) or (protect_frontmatter and not writable):
             raise ValueError('Configure protect_frontmatter as a boolean for a writable vault')
         checks = _checks(settings.get('checks'), writable)
+        instructions, skills_dir, memory_dir = _agents(settings)
         read_obsidian = settings.get('read_obsidian', True)
         if not isinstance(read_obsidian, bool):
             raise ValueError('Configure read_obsidian as a boolean')
@@ -408,7 +475,8 @@ def create_app(config: dict) -> Starlette:
             raise ValueError('FSRS Vocabulary needs read_obsidian for settings and review history')
         vault = Vault(Path(settings['root']), allowed, checker=checker, protect_frontmatter=protect_frontmatter,
                       checks=checks, read_obsidian=read_obsidian, canvas=integrations['canvas'],
-                      bases=integrations['bases'], media_gallery=integrations['media_gallery'])
+                      bases=integrations['bases'], media_gallery=integrations['media_gallery'],
+                      agent_dirs=[skills_dir, memory_dir])
         policy = IndexPolicy(vault, settings.get('indexing', {}))
         roots.append(vault.root)
         trash_dir = None
@@ -434,7 +502,8 @@ def create_app(config: dict) -> Starlette:
             state_dirs.append(state)
         if policy.auto and state is None:
             raise ValueError('Automatic indexing needs an embeddings state directory')
-        mounted.append((name, bearer, vault, writable, trash_dir, embeddings, state, integrations, policy, vectors))
+        mounted.append((name, bearer, vault, writable, trash_dir, embeddings, state, integrations, policy, vectors,
+                        instructions, skills_dir, memory_dir))
 
     if any(_overlap(trash, root) for trash in trash_dirs for root in roots):
         raise ValueError('The trash and vault directories must not overlap')
@@ -445,7 +514,8 @@ def create_app(config: dict) -> Starlette:
            for directory in (*roots, *trash_dirs, *state_dirs)):
         raise ValueError('Keep checker scripts outside vaults, trash and embedding state')
 
-    for name, token, vault, writable, trash_dir, embeddings, state, integrations, policy, vectors in mounted:
+    for (name, token, vault, writable, trash_dir, embeddings, state, integrations, policy, vectors,
+         instructions, skills_dir, memory_dir) in mounted:
         search = (SearchIndex(vault, embeddings, state, indexing=policy, vectors=vectors, metrics=metrics)
                   if state is not None else None)
         if search is not None:
@@ -459,7 +529,8 @@ def create_app(config: dict) -> Starlette:
                     schedules.append(schedule)
         server = vault_server(name, vault, writable=writable, trash_dir=trash_dir, search=search,
                               iconic_offline=integrations['iconic_offline'], fsrs_dictionary=integrations['fsrs_dictionary'],
-                              excalidraw=integrations['excalidraw'])
+                              excalidraw=integrations['excalidraw'], instructions=instructions,
+                              skills_dir=skills_dir, memory_dir=memory_dir)
         if metrics is not None:
             server.middleware.append(metrics.observe_mcp)
         app = server.streamable_http_app(stateless_http=True, json_response=True, transport_security=security)

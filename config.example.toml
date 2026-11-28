@@ -9,6 +9,11 @@ writable = false
 # protect_frontmatter = true
 # trash_dir = "/path/to/private/trash"
 
+# [vaults.notes.agents]
+# instructions = ["AGENTS.md", "GEMINI.md", "CLAUDE.md"]
+# skills_dir = ".agents/skills"
+# memory_dir = ".agents/memory"
+
 # [vaults.notes.integrations]
 # canvas = true
 # bases = true

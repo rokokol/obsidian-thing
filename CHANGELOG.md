@@ -4,11 +4,14 @@
 
 ### Changed
 
+- Read the first readable instruction file of `AGENTS.md`, `GEMINI.md` and `CLAUDE.md` with `obsidian.agentsmd`, and set the order per vault
 - Rename each tool to the obsidian namespace, for example from `wiki.read` to `obsidian.read`
 - Make Canvas, Bases and Media Gallery optional per vault. Media Gallery is off by default
 
 ### Added
 
+- List and read the skills of a vault under `.agents/skills` with `obsidian.skills_list` and `obsidian.skill_read`
+- List, read and write the memory notes of a vault under `.agents/memory` with `obsidian.memory_list`, `obsidian.memory_read` and `obsidian.memory_write`, which updates the line of the note in `MEMORY.md`
 - Create and replace UTF-8 files through `obsidian.write` in vaults that allow writes explicitly
 - Replace a unique text fragment at a known revision through `obsidian.update`
 - Move an unreferenced file to private trash with `obsidian.delete`

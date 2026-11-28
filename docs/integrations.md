@@ -15,7 +15,7 @@ A disabled integration does not scan or rewrite its references. The text tools s
 
 ## Obsidian settings
 
-`read_obsidian` defaults to `true`. It permits `obsidian.read` and `obsidian.stat` on explicit paths under `.obsidian/`. Other hidden paths and symlinks remain inaccessible. The graph and search do not scan `.obsidian`. The general write tools cannot change it
+`read_obsidian` defaults to `true`. It permits `obsidian.read` and `obsidian.stat` on explicit paths under `.obsidian/`. Other hidden paths and symlinks remain inaccessible. The graph and search do not scan `.obsidian`. The general write tools cannot change it. The [agent tools](agents.md) read the configured directories under `.agents/` by name and never open them through `obsidian.read`
 
 Plugin settings can contain credentials. Any client with the vault token can read these settings when `read_obsidian` is on. Set it to `false` if the client must not have that access. Some integrations require it to be on
 

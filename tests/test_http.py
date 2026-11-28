@@ -49,7 +49,7 @@ def docker_endpoint(image, directory, vaults):
         + ''.join(f'\n[vaults.{name}.{table}]\n' + ''.join(
             f'{key} = {json.dumps("/fixtures/state" if key == "state_dir" else value)}\n'
             for key, value in settings[table].items())
-            for table in ('integrations', 'indexing', 'embeddings') if table in settings)
+            for table in ('agents', 'integrations', 'indexing', 'embeddings') if table in settings)
         for name, settings in vaults.items()
     ) + ('\n[vaults.first.checker]\nscript = "/fixtures/checker.py"\ntimeout_seconds = 1\n'
          if 'checker' in vaults['first'] else '')
@@ -82,11 +82,19 @@ def endpoint(tmp_path, monkeypatch, request):
         (root / 'notes').mkdir()
         (root / 'notes' / 'same.md').write_text(name)
         (root / 'AGENTS.md').write_text(f'Rules for {name}')
+        (root / 'GEMINI.md').write_text(f'Gemini rules for {name}')
+        skill = root / '.agents' / 'skills' / 'demo'
+        skill.mkdir(parents=True)
+        (skill / 'SKILL.md').write_text('---\nname: demo\ndescription: Demo skill\n---\n# Demo\n')
+        memory = root / '.agents' / 'memory'
+        memory.mkdir(parents=True)
+        (memory / 'MEMORY.md').write_text('# Memory index\n')
         (root / 'private.txt').write_text('private')
         (root / 'notes' / 'link.md').symlink_to('../private.txt')
         var = f'TEST_TOKEN_{name.upper()}'
         monkeypatch.setenv(var, name)
-        vaults[name] = {'root': str(root), 'allowed': ['notes', 'AGENTS.md'], 'token_env': var}
+        vaults[name] = {'root': str(root), 'allowed': ['notes', 'AGENTS.md', 'GEMINI.md'], 'token_env': var,
+                        'agents': {'instructions': ['GEMINI.md', 'AGENTS.md']}}
     trash = tmp_path / 'trash'
     trash.mkdir(mode=0o700)
     vaults['first'].update(writable=True, trash_dir=str(trash))
@@ -483,13 +491,15 @@ def test_tools_read_live_files_in_the_selected_vault(endpoint, mode, version):
                     assert session.protocol_version == version
                     tools = await session.list_tools()
                     expected = {'obsidian.allowed', 'obsidian.agentsmd', 'obsidian.read', 'obsidian.stat',
-                                'obsidian.links_out', 'obsidian.links_in', 'obsidian.media'}
+                                'obsidian.links_out', 'obsidian.links_in', 'obsidian.media',
+                                'obsidian.skills_list', 'obsidian.skill_read',
+                                'obsidian.memory_list', 'obsidian.memory_read'}
                     if name == 'first':
                         expected.update(('obsidian.write', 'obsidian.update', 'obsidian.delete', 'obsidian.rename',
-                                         'obsidian.canvas_edit', 'obsidian.base_edit'))
+                                         'obsidian.canvas_edit', 'obsidian.base_edit', 'obsidian.memory_write'))
                     assert {tool.name for tool in tools.tools} == expected
                     allowed = await session.call_tool('obsidian.allowed')
-                    assert set(allowed.structured_content['paths']) == {'notes', 'AGENTS.md'}
+                    assert set(allowed.structured_content['paths']) == {'notes', 'AGENTS.md', 'GEMINI.md'}
                     note = await session.call_tool('obsidian.read', {'path': 'notes/same.md'})
                     assert note.structured_content['content'] == name
                     assert note.structured_content['revision'] == sha256(name.encode()).hexdigest()
@@ -497,7 +507,24 @@ def test_tools_read_live_files_in_the_selected_vault(endpoint, mode, version):
                     recent = await session.call_tool('obsidian.read', {'path': 'notes/same.md'})
                     assert recent.structured_content['content'] == f'{name} changed'
                     rules = await session.call_tool('obsidian.agentsmd')
-                    assert rules.structured_content['content'] == f'Rules for {name}'
+                    assert rules.structured_content['content'] == f'Gemini rules for {name}'
+                    skills = await session.call_tool('obsidian.skills_list')
+                    assert [skill['name'] for skill in skills.structured_content['skills']] == ['demo']
+                    demo = await session.call_tool('obsidian.skill_read', {'name': 'demo'})
+                    assert demo.structured_content['content'].endswith('# Demo\n')
+                    assert (await session.call_tool('obsidian.memory_list')).structured_content['memories'] == []
+                    if name == 'first':
+                        note = '---\nname: reference-demo\ndescription: Demo fact\n---\nBody\n'
+                        written = await session.call_tool('obsidian.memory_write',
+                                                          {'name': 'reference-demo', 'content': note})
+                        assert not written.is_error, written.content
+                        listed = await session.call_tool('obsidian.memory_list')
+                        assert listed.structured_content['memories'][0]['description'] == 'Demo fact'
+                        index = await session.call_tool('obsidian.memory_read', {'name': 'MEMORY.md'})
+                        assert '](reference-demo.md) — Demo fact' in index.structured_content['content']
+                        again = await session.call_tool('obsidian.memory_write',
+                                                        {'name': 'reference-demo', 'content': note})
+                        assert again.is_error
                     for path in ('private.txt', 'notes-backup/file.md', 'notes/../private.txt', 'notes/link.md'):
                         denied = await session.call_tool('obsidian.read', {'path': path})
                         assert denied.is_error

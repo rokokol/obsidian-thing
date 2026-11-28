@@ -13,7 +13,7 @@
 
 An agent that works in a vault needs to read notes, follow links, find related material and sometimes write. Obsidian Thing serves that over MCP Streamable HTTP from a directory on disk. It does not need the Obsidian app, a plugin or a sync service. Each vault has its own endpoint and its own bearer token, and an allowlist decides which paths that token reaches
 
-Writing is off by default. A writable vault gets atomic replacement at a revision, a Python checker that can reject a proposed edit, and optional rules for quotes, periods, links, callouts, Canvas and Base files. A file that lands in the trash comes back by hand
+Writing is off by default. A writable vault gets atomic replacement at a revision and optional rules for quotes, periods, links, callouts, Canvas and Base files. Anything those rules do not cover is a linter of your own: a Python script that sees every proposed write and allows it, warns about it or refuses it. A file that lands in the trash comes back by hand
 
 Search is optional and stays local. Text search needs no model. Metadata search filters notes by tag, alias, property or file name. Embeddings add semantic search, related notes and a two-axis neighbourhood map, from a local server or a remote provider that you permit explicitly
 

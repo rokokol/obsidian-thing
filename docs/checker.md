@@ -1,5 +1,7 @@
 # Check writes before they reach disk
 
+The checker is a linter for the vault. It runs on every proposed write and can allow it, warn about it or refuse it, so a rule the built-in checks do not carry — a naming scheme, a required property, a banned word, an order of sections — is a script rather than a feature request
+
 Set `checker.script` for a writable vault in [the example config](../config.example.toml). If you omit the checker table, the server does not run a script. In Docker, mount the script or its directory read-only and use its absolute path inside the container
 
 The server runs the script with its Python interpreter, with no user site-packages, and with the package directories of the server. Every other environment variable, including vault tokens, is absent. Keep the script outside all vaults, trash and embedding state. Use only trusted code: the process has the server user's permissions and is not a sandbox

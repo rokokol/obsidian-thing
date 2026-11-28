@@ -153,8 +153,9 @@ allowed = ["Notes", "Projects/2026", "AGENTS.md"]</code></pre>
         <li data-ru="Ответ несёт не больше десяти предупреждений, пока не передан &lt;code&gt;all_warnings = true&lt;/code&gt;">The reply carries at most ten warnings unless <code>all_warnings = true</code> is passed</li>
       </ul>
 
-      <h2 data-ru="Чекер: своя проверка перед записью">The checker: your own check before the write</h2>
-      <p data-ru="Доверенный скрипт получает один JSON: операция, путь, текст до и после, ссылки и выбранные свойства. Он отвечает allow, warnings или reject">A trusted script receives one JSON object with the operation, the path, the text before and after, the links and the selected properties, and answers allow, warnings or reject</p>
+      <h2 data-ru="Чекер: линтер волта">The checker: a linter for the vault</h2>
+      <p data-ru="Чекер — это линтер, а не один жёсткий набор правил. Встроенные проверки знают про кавычки, точки и ссылки, а свои правила ты пишешь сам: схема имён, обязательное свойство, запрещённое слово, порядок секций — всё, что выражается в Python">The checker is a linter rather than one fixed rule set. The built-in checks know about quotes, periods and links, and the rest you write yourself: a naming scheme, a required property, a banned word, the order of sections, whatever Python can express</p>
+      <p data-ru="Скрипт получает один JSON: операция, путь, текст до и после, ссылки и выбранные свойства. Он отвечает allow, warnings или reject">The script receives one JSON object with the operation, the path, the text before and after, the links and the selected properties, and answers allow, warnings or reject</p>
       <ul>
         <li data-ru="Тайм-аут, ненулевой код возврата, битый ответ или вывод больше 16 КиБ блокируют запись">A timeout, a non-zero exit, a malformed answer or more than 16 KiB of output blocks the write</li>
         <li data-ru="Чекер не возвращает замену текста и не участвует в удалении">The checker returns no replacement text and takes no part in a deletion</li>

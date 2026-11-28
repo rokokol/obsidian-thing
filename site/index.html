@@ -180,7 +180,7 @@
         <a class="card" href="./docs/safety.html">
           <span class="sticker alt" data-ru="запись">writing</span>
           <h3 data-ru="Замена, правка фрагмента, переименование">Replace, edit a fragment, rename</h3>
-          <p data-ru="Запись выключена по умолчанию. Там, где она включена, правка идёт атомарной заменой по ревизии. Правила и Python-чекер могут отклонить текст до того, как он попадёт на диск">Writing is off by default. In a writable vault it is an atomic replacement at a revision, and rules or a Python checker can reject the proposed text before it reaches disk</p>
+          <p data-ru="Запись выключена по умолчанию. Там, где она включена, правка идёт атомарной заменой по ревизии. Отклонить текст до диска могут и правила, и свой линтер: Python-скрипт, куда добавляют проверки, которых нет во встроенном наборе">Writing is off by default. In a writable vault it is an atomic replacement at a revision, and either the rules or your own linter can reject the text before it reaches disk: a Python script that holds the checks the built-in set does not</p>
           <ul>
             <li data-ru="&lt;code&gt;obsidian.update&lt;/code&gt; заменяет один точный фрагмент"><code>obsidian.update</code> replaces one exact fragment</li>
             <li data-ru="Переименование правит видимые ссылки">A rename updates the visible links</li>

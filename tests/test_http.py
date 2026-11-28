@@ -42,7 +42,7 @@ def docker_endpoint(image, directory, vaults):
     config = directory / 'config.toml'
     config.write_text('\n'.join(
         f'[vaults.{name}]\nroot = "/fixtures/{name}"\n'
-        f'allowed = ["notes", "AGENTS.md"]\ntoken_env = "{settings["token_env"]}"\n'
+        f'allowed = {json.dumps(settings["allowed"])}\ntoken_env = "{settings["token_env"]}"\n'
         + ('writable = true\ntrash_dir = "/fixtures/trash"\n' if settings.get('writable') else '')
         + ('protect_frontmatter = true\n' if settings.get('protect_frontmatter') else '')
         + (f'read_obsidian = {json.dumps(settings["read_obsidian"])}\n' if 'read_obsidian' in settings else '')

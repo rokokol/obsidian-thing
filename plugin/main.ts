@@ -154,6 +154,10 @@ function formatScore(score: number): string {
   return Number.isFinite(score) ? score.toFixed(3) : "-";
 }
 
+function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
+  return count === 1 ? singular : pluralForm;
+}
+
 function countText(value: number | null | undefined): string {
   return value === null || value === undefined ? "Not scanned yet" : String(value);
 }
@@ -223,6 +227,13 @@ function matchMeta(match: SectionMatch): string {
   return parts.join(" | ");
 }
 
+function sectionMeta(section: SectionMatch): string {
+  const parts = [`Score ${formatScore(section.score)}`];
+  if (section.page !== undefined) parts.push(`Page ${section.page}`);
+  if (section.line_start !== undefined) parts.push(`Line ${section.line_start}`);
+  return parts.join(" | ");
+}
+
 function sectionLabel(section: SectionMatch): string {
   if (section.headings?.length) return section.headings.join(" > ");
   if (section.line_start !== undefined) return `Line ${section.line_start}`;
@@ -260,7 +271,8 @@ function renderMatches(
           attr: { type: "button", "aria-label": `Open ${match.path} at ${sectionLabel(section)}` },
         });
         sectionButton.createSpan({ cls: "thing-section-title", text: sectionLabel(section) });
-        sectionButton.createSpan({ cls: "thing-section-meta", text: matchMeta(section) });
+        // The label already names the section, so the line and the score are enough
+        sectionButton.createSpan({ cls: "thing-section-meta", text: sectionMeta(section) });
         sectionButton.addEventListener("click", () => void plugin.openPath(match.path, section.line_start));
       }
     }
@@ -357,10 +369,11 @@ class ObsidianThingPlugin extends Plugin {
     this.toolsPending = pending;
     try {
       const tools = await pending;
-      if (version === this.connectionVersion) {
-        this.toolsValue = tools;
-        this.syncStatusCommand(tools);
+      if (version !== this.connectionVersion) {
+        throw new Error("The connection settings changed; run the request again");
       }
+      this.toolsValue = tools;
+      this.syncStatusCommand(tools);
       return tools;
     } catch (error) {
       if (version === this.connectionVersion) this.toolsValue = null;
@@ -465,6 +478,7 @@ class SidebarView extends ItemView {
 
   private tools: Set<string> | null = null;
   private toolsError: string | null = null;
+  private toolsSequence = 0;
   private built = false;
   private eventsRegistered = false;
   private activeTab: "search" | "related" = "search";
@@ -547,6 +561,7 @@ class SidebarView extends ItemView {
   protected override async onClose(): Promise<void> {
     this.search.sequence += 1;
     this.related.sequence += 1;
+    this.toolsSequence += 1;
     this.search.busy = false;
     this.related.busy = false;
     this.search.output = null;
@@ -558,6 +573,7 @@ class SidebarView extends ItemView {
   connectionChanged(): void {
     this.search.sequence += 1;
     this.related.sequence += 1;
+    this.toolsSequence += 1;
     this.search.busy = false;
     this.related.busy = false;
     this.search.output = null;
@@ -874,19 +890,22 @@ class SidebarView extends ItemView {
 
   private async refreshTools(force: boolean): Promise<void> {
     if (!this.built) return;
+    const sequence = ++this.toolsSequence;
     this.setConnection(force ? "Checking server tools..." : "Loading server tools...", false);
     this.recheckButton.disabled = true;
     try {
       const tools = await this.plugin.ensureTools(force);
+      if (sequence !== this.toolsSequence || !this.built) return;
       this.tools = tools;
       this.toolsError = null;
     } catch (error) {
+      if (sequence !== this.toolsSequence || !this.built) return;
       this.tools = null;
       this.toolsError = errorText(error);
     } finally {
-      this.recheckButton.disabled = false;
+      if (sequence === this.toolsSequence && this.built) this.recheckButton.disabled = false;
     }
-    if (!this.built) return;
+    if (sequence !== this.toolsSequence || !this.built) return;
     this.applyTools();
   }
 
@@ -921,7 +940,7 @@ class SidebarView extends ItemView {
     } else if (!ready) {
       this.setConnection("Checking server tools...", false);
     } else {
-      this.setConnection(`Connected. ${this.tools!.size} tools available.`, false);
+      this.setConnection(`Connected. ${this.tools!.size} ${plural(this.tools!.size, "tool")} available.`, false);
     }
 
     if (ready && !queryAvailable && this.search.output === null) {
@@ -1025,7 +1044,7 @@ class SidebarView extends ItemView {
       } else if (result.matches.length === 0) {
         this.setSearchStatus("No notes matched this query.", false);
       } else {
-        this.setSearchStatus(`Found ${result.matches.length} notes.`, false);
+        this.setSearchStatus(`Found ${result.matches.length} ${plural(result.matches.length, "note")}.`, false);
       }
     } catch (error) {
       if (sequence !== this.search.sequence) return;
@@ -1100,7 +1119,7 @@ class SidebarView extends ItemView {
       this.search.output = { kind: "paths", paths: result.paths };
       this.renderSearchOutput();
       this.setSearchStatus(
-        result.paths.length === 0 ? "No notes match these filters." : `Found ${result.paths.length} notes.`,
+        result.paths.length === 0 ? "No notes match these filters." : `Found ${result.paths.length} ${plural(result.paths.length, "note")}.`,
         false,
       );
     } catch (error) {
@@ -1148,7 +1167,9 @@ class SidebarView extends ItemView {
       this.renderRelatedOutput();
       this.updateStaleNotice();
       this.setRelatedStatus(
-        result.matches.length === 0 ? "No related files found." : `Found ${result.matches.length} related files.`,
+        result.matches.length === 0
+          ? "No related files found."
+          : `Found ${result.matches.length} related ${plural(result.matches.length, "file")}.`,
         false,
       );
     } catch (error) {
@@ -1395,7 +1416,8 @@ class MapView extends ItemView {
         throw new Error("The server returned an unexpected map response.");
       }
       this.renderMap(result);
-      this.setStatus(`Mapped ${result.points.length - 1} neighbors.`, false);
+      const neighbors = result.points.length - 1;
+      this.setStatus(`Mapped ${neighbors} ${plural(neighbors, "neighbor")}.`, false);
     } catch (error) {
       if (sequence !== this.sequence) return;
       this.setStatus(errorText(error), true);
@@ -1965,7 +1987,8 @@ class ThingSettingTab extends PluginSettingTab {
       const status = tools.has("obsidian.status") ? "yes" : "no";
       this.testStatusEl.addClass("is-success");
       this.testStatusEl.setText(
-        `Connected. ${tools.size} tools available. Related: ${related}. Map: ${map}. Status: ${status}.`,
+        `Connected. ${tools.size} ${plural(tools.size, "tool")} available. ` +
+          `Related: ${related}. Map: ${map}. Status: ${status}.`,
       );
     } catch (error) {
       this.testStatusEl.addClass("is-error");

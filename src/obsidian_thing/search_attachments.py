@@ -84,7 +84,16 @@ def _validate_media(mime: str, data: bytes) -> float | int | None:
                                         for repr_count in counts) else None
 
 
-def attachment_parts(mime: str, data: bytes) -> Iterator[bytes]:
+def _pdf_pages(reader: PdfReader, limit: int) -> int:
+    pages = len(reader.pages)
+    if reader.is_encrypted:
+        raise VaultError('The PDF is encrypted; the index cannot read it')
+    if not 1 <= pages <= limit:
+        raise VaultError(f'The PDF has {pages} pages; the configured limit is {limit}')
+    return pages
+
+
+def attachment_parts(mime: str, data: bytes, *, max_pdf_pages: int = PDF_PAGE_LIMIT) -> Iterator[bytes]:
     if mime in MEDIA_FORMATS:
         _validate_media(mime, data)
         yield data
@@ -92,8 +101,7 @@ def attachment_parts(mime: str, data: bytes) -> Iterator[bytes]:
     if mime == 'application/pdf':
         try:
             reader = PdfReader(BytesIO(data), strict=True)
-            if reader.is_encrypted or not 1 <= len(reader.pages) <= PDF_PAGE_LIMIT:
-                raise VaultError('Use an unencrypted PDF within the page limit')
+            _pdf_pages(reader, max_pdf_pages)
             total_size = 0
             for page in reader.pages:
                 writer = PdfWriter()

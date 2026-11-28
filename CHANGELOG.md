@@ -36,6 +36,7 @@
 - Leave a heading without a body out of the index, and keep fragments shorter than `min_chunk_words` out of the vector index. The default is 24 words and `0` keeps every fragment
 - Index Markdown and plain text for semantic search with Ollama or opt-in OpenRouter
 - Record embedding calls and USD costs in a separate SQLite journal
+- Set `max_pdf_pages` per vault and name the page count in the PDF error instead of one message for two causes
 - Report index coverage, the embedding queue, the last full scan, the model profile and recorded costs with `obsidian.status`
 - Find indexed notes by tag, alias and YAML property with `obsidian.find`. The tool does not need embeddings
 - Remove a memory note and its line in `MEMORY.md` with `obsidian.memory_delete`, and repair the whole index with `obsidian.memory_index_write`

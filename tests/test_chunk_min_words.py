@@ -2,6 +2,7 @@ import pytest
 
 from obsidian_thing.embeddings import Embedder
 from obsidian_thing.search import SearchIndex
+from obsidian_thing.search_attachments import attachment_parts
 from obsidian_thing.search_chunks import chunks
 from obsidian_thing.vault import Vault, VaultError
 
@@ -101,3 +102,31 @@ def test_a_vector_written_as_json_is_packed_at_startup_and_a_broken_row_is_dropp
     with sqlite3.connect(reopened.database) as db:
         rows = dict(db.execute('SELECT hash, typeof(vector) FROM vectors').fetchall())
     assert rows == {'old': 'blob'}
+
+
+def _pdf(pages: int) -> bytes:
+    from io import BytesIO
+    from pypdf import PdfWriter
+    writer = PdfWriter()
+    for _ in range(pages):
+        writer.add_blank_page(width=200, height=200)
+    buffer = BytesIO()
+    writer.write(buffer)
+    return buffer.getvalue()
+
+
+def test_pdf_page_limit_names_the_counts_and_follows_the_setting(tmp_path):
+    root = tmp_path / 'vault'
+    root.mkdir()
+    state = tmp_path / 'state'
+    state.mkdir(mode=0o700)
+    (root / 'book.pdf').write_bytes(_pdf(29))
+    config = dict(provider='ollama', model='synthetic', dimensions=2, max_pdf_pages=16)
+    index = SearchIndex(Vault(root, ['.']), config, state)
+    with pytest.raises(VaultError, match='has 29 pages; the configured limit is 16'):
+        list(attachment_parts('application/pdf', (root / 'book.pdf').read_bytes(), max_pdf_pages=16))
+    with pytest.raises(ValueError, match='max_pdf_pages'):
+        SearchIndex(Vault(root, ['.']), config | {'max_pdf_pages': 0}, tmp_path / 'other')
+    assert len(list(attachment_parts('application/pdf', (root / 'book.pdf').read_bytes(),
+                                     max_pdf_pages=29))) == 29
+    assert index.max_pdf_pages == 16

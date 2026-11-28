@@ -63,7 +63,7 @@ To send text to a remote endpoint, set `allow_cloud = true` and specify `include
 
 The default `allowed_mime_types` contains `text/markdown` and `text/plain`. Append each attachment type that the server can send: `image/png`, `image/jpeg`, `application/pdf`, `audio/wav`, `audio/mpeg` (MP3), or `video/mp4`. Use `google/gemini-embedding-2` through OpenRouter on a Google Vertex route. Remote consent and embedding paths apply to attachments too
 
-Files must match their formats. The server limits files and PDF pages to 5 MiB each, split PDF output to 10 MiB, images to 16 megapixels, and PDF documents to 16 pages. The server rejects encrypted PDF files. It sends one PDF page per request, without OCR or raster conversion
+Files must match their formats. The server limits files and split PDF pages to 5 MiB each, split PDF output to 10 MiB, images to 16 megapixels, and PDF documents to `max_pdf_pages` pages, which defaults to 16. A larger document returns an error that names its page count and the limit. The server rejects encrypted PDF files. It sends one PDF page, one request and one vector per page, without OCR or raster conversion
 
 The server checks audio and video with `ffprobe` before transfer. Audio can last up to 180 seconds. MP4 can last up to 120 seconds and must use H.264, HEVC, AV1, or VP9. The file size limit still applies. For an installation outside Nix, put `ffprobe` with `fd` protocol support on the service's `PATH`
 

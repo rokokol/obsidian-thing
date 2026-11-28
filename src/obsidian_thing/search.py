@@ -24,7 +24,8 @@ from .metrics import Metrics
 from .projection import project
 
 _VECTOR = np.dtype('<f4')
-from .search_attachments import ATTACHMENT_LIMIT, SUFFIX_TYPES, TEXT_TYPES, attachment_parts, mime_type
+from .search_attachments import (ATTACHMENT_LIMIT, PDF_PAGE_LIMIT, SUFFIX_TYPES, TEXT_TYPES,
+                                  attachment_parts, mime_type)
 from .search_chunks import Chunk, chunks, section_lines
 from .search_metadata import fold, metadata_rows, tag_key
 from .vault import TextFile, Vault, VaultError, _parts
@@ -77,6 +78,7 @@ class IndexStatus(TypedDict):
 
 class EmbeddingStatus(EmbeddingDescription):
     min_chunk_words: int
+    max_pdf_pages: int
     related_min_score: float
     allowed_mime_types: list[str]
 
@@ -155,6 +157,10 @@ class SearchIndex:
         if type(threshold) not in (int, float) or not -1 <= threshold <= 1:
             raise ValueError('Configure related_min_score between -1 and 1')
         self.related_min_score: float = threshold
+        pages = config.get('max_pdf_pages', PDF_PAGE_LIMIT)
+        if type(pages) is not int or not 1 <= pages <= 2000:
+            raise ValueError('Configure embedding max_pdf_pages as an integer from 1 to 2000')
+        self.max_pdf_pages: int = pages
         self.embedder = Embedder(config, state, metrics=metrics) if vectors else None
         types = config.get('allowed_mime_types', list(TEXT_TYPES)) if vectors else []
         if not isinstance(types, list) or not all(isinstance(t, str) and t in SUFFIX_TYPES.values() for t in types):
@@ -304,7 +310,7 @@ class SearchIndex:
                 revision = _attachment_revision(stamp, data)
                 if queued_revision is not None and revision != queued_revision:
                     raise VaultError('The queued revision is no longer current')
-                payloads = list(attachment_parts(mime, data))
+                payloads = list(attachment_parts(mime, data, max_pdf_pages=self.max_pdf_pages))
                 locations = [('[]', None, None)] * len(payloads)
             digests = [sha256(p.encode() if isinstance(p, str) else f'attachment-v1:{mime}:'.encode() + p).hexdigest()
                        for p in payloads]
@@ -436,7 +442,7 @@ class SearchIndex:
                             stamp, data = self.vault.read_attachment(path, ATTACHMENT_LIMIT)
                             revision = _attachment_revision(stamp, data)
                             if not row or row[0] != revision:
-                                for _ in attachment_parts(mime, data):
+                                for _ in attachment_parts(mime, data, max_pdf_pages=self.max_pdf_pages):
                                     pass
                                 with self._write(db):
                                     self._delete_path(db, path)
@@ -602,6 +608,7 @@ class SearchIndex:
             report['embeddings'] = {
                 **self.embedder.description(),
                 'min_chunk_words': self.min_chunk_words,
+                'max_pdf_pages': self.max_pdf_pages,
                 'related_min_score': self.related_min_score,
                 'allowed_mime_types': sorted(self.allowed_mime_types),
             }

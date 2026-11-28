@@ -39,6 +39,7 @@
 - Find indexed notes by tag, alias and YAML property with `obsidian.find`. The tool does not need embeddings
 - Remove a memory note and its line in `MEMORY.md` with `obsidian.memory_delete`, and repair the whole index with `obsidian.memory_index_write`
 - Draw a file and its nearest neighbors on two axes with `obsidian.map`. The tool keeps the vector rank and requires the plugin client header
+- Name every tool and the configuration that offers it in one reference, with a page for every configuration key and a guide to deployment
 
 ## [0.1.0] - 2026-11-19
 

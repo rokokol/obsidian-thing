@@ -1,90 +1,70 @@
+<div align="center">
+
 # Obsidian Thing
 
-[![CI](https://github.com/rokokol/obsidian-thing/actions/workflows/build.yml/badge.svg)](https://github.com/rokokol/obsidian-thing/actions/workflows/build.yml) [![GHCR](https://img.shields.io/badge/container-GHCR-555)](https://github.com/rokokol/obsidian-thing/pkgs/container/obsidian-thing)
+**Your Obsidian vault behind an MCP endpoint: one address and one token for each vault, reads without Obsidian running, writes that check the revision and your own rules**
 
-Obsidian Thing serves Obsidian vaults over MCP Streamable HTTP. Each vault has its own endpoint and bearer token. The server can read text files and vault instructions without a running Obsidian app
+[![CI](https://github.com/rokokol/obsidian-thing/actions/workflows/build.yml/badge.svg)](https://github.com/rokokol/obsidian-thing/actions/workflows/build.yml)
+[![GHCR](https://img.shields.io/badge/container-GHCR-555)](https://github.com/rokokol/obsidian-thing/pkgs/container/obsidian-thing)
+[![license](https://img.shields.io/badge/license-MIT-3DA639)](LICENSE)
+[![workarounds](https://img.shields.io/badge/docs-workarounds-555)](WORKAROUNDS.md)
 
-## Run locally
+</div>
 
-Copy [`config.example.toml`](config.example.toml) to `config.toml`. Set the vault root and the paths that each client may read. An allowed directory grants access to its subtree. Use `"."` to allow the whole vault, except for hidden paths and symbolic links
+An agent that works in a vault needs to read notes, follow links, find related material and sometimes write. Obsidian Thing serves that over MCP Streamable HTTP from a directory on disk. It does not need the Obsidian app, a plugin or a sync service. Each vault has its own endpoint and its own bearer token, and an allowlist decides which paths that token reaches
 
-Set the environment variable named by `token_env` to a random secret. Use a different token for each vault that needs separate access. Start the native package with Nix:
+Writing is off by default. A writable vault gets atomic replacement at a revision, a Python checker that can reject a proposed edit, and optional rules for quotes, periods, links, callouts, Canvas and Base files. A file that lands in the trash comes back by hand
+
+Search is optional and stays local. Text search needs no model. Metadata search filters notes by tag, alias, property or file name. Embeddings add semantic search, related notes and a two-axis neighbourhood map, from a local server or a remote provider that you permit explicitly
+
+## Quick start
+
+Copy [`config.example.toml`](config.example.toml) to `config.toml` and name one vault:
+
+```toml
+[vaults.notes]
+root = "/srv/notes"
+allowed = ["."]
+token_env = "OBSIDIAN_THING_NOTES_TOKEN"
+```
+
+Export the token and start the server:
 
 ```sh
+export OBSIDIAN_THING_NOTES_TOKEN=$(openssl rand -hex 32)
 nix run . -- --config config.toml
 ```
 
-For a local run without Nix, use `uv run --locked obsidian-thing --config config.toml`
+Point the client at `http://127.0.0.1:8765/vaults/notes/mcp` and send `Authorization: Bearer $OBSIDIAN_THING_NOTES_TOKEN`. For a checkout without Nix, run `uv run --locked obsidian-thing --config config.toml`. The [deployment guide](docs/deployment.md) covers Docker, a reverse proxy, tokens, the state directory and the trash
 
-Use the listen address printed by the server and the endpoint `/vaults/<vault_id>/mcp`. Send `Authorization: Bearer <token>` with each request. For remote access, put the server behind HTTPS and set `allowed_hosts` in the TOML file to the host names that the proxy forwards
+## What the agent gets
 
-Vaults allow reads by default. Set `writable = true` for a vault to enable `obsidian.write` and `obsidian.update` for any client with its token. Search is optional. See [TODO.md](TODO.md) for the remaining work
+- **Reading.** Files with their revision, metadata without the bytes, outgoing links, backlinks and attachment metadata. Canvas and Base files count as documents, and their links join the graph
+- **Writing.** Create, replace, edit one fragment, rename with link updates, and move a file to a private trash. Every change carries an expected revision, and a rename refuses rather than leave a link broken
+- **Vault instructions.** The vault's own rules, its skills and its memory: `AGENTS.md`, `.agents/skills` and `.agents/memory`, read by name instead of through the path allowlist
+- **Search.** Full-text ranking without a model, metadata filters, vectors, related notes and a neighbourhood map. An index status call reports coverage, the embedding queue and recorded provider costs
+- **Vault integrations.** Canvas and Base structural edits, Iconic file icons, FSRS Vocabulary cards and offline Excalidraw export, each one a switch per vault
+- **One Obsidian plugin.** Search, related notes, the map and the index status inside the app, from the server's own index
 
-`obsidian.write` creates a UTF-8 file in an existing directory when you omit `expected_revision`. To replace a file, pass the revision from `obsidian.read`. Run one server process per writable vault. Revision checks do not protect against concurrent edits outside that process or unsaved Obsidian edits
-
-`obsidian.update` replaces a non-empty `old` fragment with `new` at the revision given by `expected_revision`. The fragment must occur exactly once, including overlapping matches
-
-Enable `obsidian.delete` with `trash_dir` in a writable vault. Use an existing private directory outside all vaults, owned by the server user. The trash and the file must share a mount. If the move fails, the file stays in the vault. The tool does not remove paths named directly in `allowed`, because the server needs them at startup
-
-To restore a deletion, read `$trash_dir/<trash_id>/path` for the original vault-relative path. Move the sibling `file` back without overwriting an existing file. The server does not purge the trash
+The [tool reference](docs/tools.md) lists every tool with its arguments and the switch that offers it
 
 ## Documentation
 
-- [Vault instructions, skills and memory](docs/agents.md): read the vault's rules, list its skills and keep agent memory in the vault
-- [Obsidian plugin](docs/plugin.md): search the vault, explore related files and view index status from Obsidian
-- [Python write checker](docs/checker.md): configure a script to warn about or reject proposed edits
-- [Markdown rules for writes](docs/vault-rules.md): check quotes, periods, links and callout markers before a write
-- [Example checker](examples/checker.py): a starting point for vault-specific rules
-- [NixOS service](docs/nixos.md): configure the MCP server as a system service
-
-## Build the native package with Nix
-
-Build from a Git checkout with secrets excluded from tracked files. Without Git, copy only `flake.nix`, `flake.lock`, `nixos-module.nix`, `pyproject.toml`, `VERSION`, and `src/` to a clean directory first. Nix can copy an entire local source tree to its store
-
-```sh
-nix build .#default
-./result/bin/obsidian-thing --config /absolute/path/to/config.toml
-```
-
-For a persistent deployment, see the [NixOS service](docs/nixos.md)
-
-## Run in Docker
-
-Use the [published image](https://github.com/rokokol/obsidian-thing/pkgs/container/obsidian-thing) or build a local image with a separate output link:
-
-```sh
-nix build .#docker --out-link result-docker
-docker load --input result-docker
-```
-
-The image contains the native package. It does not need a Nix daemon at runtime
-
-For Docker, set the vault `root` in the config to `/vault`. Mount that path and the config as read-only volumes. Remove `:ro` from the vault mount only if the vault needs writes. Export the variable named by `token_env` before you start the container
-
-For deletion, mount a common parent of the vault and trash directories as one volume. Set `root` and `trash_dir` to the two subdirectories inside the container
-
-```sh
-docker run --rm --read-only --user "$(id -u):$(id -g)" \
-  --publish 127.0.0.1:8765:8765 \
-  --env OBSIDIAN_MCP_NOTES_TOKEN \
-  --volume /absolute/path/to/config.toml:/config.toml:ro \
-  --volume /absolute/path/to/vault:/vault:ro \
-  obsidian-thing:local --config /config.toml --host 0.0.0.0
-```
-
-## Semantic search
-
-Enable embeddings per vault with the settings in [`config.example.toml`](config.example.toml). Create a private state directory outside the vault and mount it writable in Docker. Use a separate directory for each vault
-
-Call `obsidian.index` to index one Markdown or plain-text file. Use `obsidian.query` for a text query or `obsidian.related` for neighbors of a note. `obsidian.related` indexes the source if needed, but searches only indexed files. The server skips deleted and outdated results. `obsidian.map` draws the same neighbors on two axes, and `obsidian.status` reports index coverage and recorded costs. You can enable [automatic updates to the local index](docs/semantic-search.md#automatic-local-index-updates)
-
-Use [Ollama, LM Studio, OpenRouter, or an OpenAI-compatible endpoint](docs/semantic-search.md#embedding-providers) for embeddings. Remote requests require explicit permission
-
-Read `<state_dir>/spend.sqlite3` to inspect provider calls. The journal does not store input text, file paths, or keys. `reported` is a price returned by the provider. `estimated` uses the configured rate and the provider's token count. `unknown` means no usable price, and `local` means no API charge is tracked
-
-```sh
-sqlite3 /absolute/path/to/state/spend.sqlite3 'SELECT at, operation, provider, model, status, cost_kind, usd FROM calls ORDER BY id DESC LIMIT 20;'
-```
+- [Tools](docs/tools.md): every tool, its arguments and the configuration that offers it
+- [Configuration](docs/config.md): every key of the TOML file and what the server refuses at start
+- [Deployment](docs/deployment.md): Nix, Docker, a reverse proxy, tokens and the trash
+- [NixOS service](docs/nixos.md): the module, the service user and the state directories
+- [Vault instructions, skills and memory](docs/agents.md): what an agent reads before it edits
+- [Semantic search](docs/semantic-search.md): the index, providers, attachments, costs and Prometheus
+- [Markdown rules](docs/vault-rules.md): quotes, periods, links, callouts and hard-wrapped paragraphs
+- [Write checker](docs/checker.md): a trusted script that warns about or rejects a proposed edit
+- [Structured edits](docs/structured-edits.md): Canvas and Base changes as a batch
+- [Links and attachments](docs/graph.md): link resolution, delete and rename
+- [Vault integrations](docs/integrations.md): the per-vault switches
+- [Obsidian plugin](docs/plugin.md): install, connect and use the sidebar and the map
+- [Index benchmark](docs/index-benchmark.md): measured scan and hash times on a 4,000-note vault
+- [Workarounds](WORKAROUNDS.md): why a few things are the way they are
+- [Remaining work](TODO.md): the open items, in Russian
 
 ## Verify
 
@@ -92,8 +72,10 @@ sqlite3 /absolute/path/to/state/spend.sqlite3 'SELECT at, operation, provider, m
 uv run --locked pytest -q
 ```
 
-To test the loaded Docker image, run the same HTTP checks against a temporary container. The tests use synthetic vaults and do not call model providers
+The suite uses synthetic vaults and calls no model provider. To test the loaded Docker image, run the same HTTP checks against a temporary container:
 
 ```sh
+nix build .#docker --out-link result-docker
+docker load --input result-docker
 OBSIDIAN_MCP_TEST_IMAGE=obsidian-thing:local uv run --locked pytest -q tests/test_http.py
 ```

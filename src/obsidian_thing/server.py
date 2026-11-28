@@ -19,8 +19,9 @@ from starlette.routing import Mount, Route
 from starlette.types import ASGIApp, Receive, Scope, Send
 from starlette.concurrency import run_in_threadpool
 
-from .agents import (DEFAULT_INSTRUCTIONS, DEFAULT_MEMORY_DIR, DEFAULT_SKILLS_DIR, Memories, MemoryWrite, Skills,
-                     list_memory, list_skills, read_instructions, read_memory, read_skill, write_memory)
+from .agents import (DEFAULT_INSTRUCTIONS, DEFAULT_MEMORY_DIR, DEFAULT_SKILLS_DIR, Memories, MemoryDelete,
+                     MemoryWrite, Skills, delete_memory, list_memory, list_skills, read_instructions,
+                     read_memory, read_skill, write_memory, write_memory_index)
 from .checker import Checker, CheckerError
 from .embedding_schedule import EmbeddingSchedule
 from .embeddings import EmbeddingError
@@ -134,6 +135,23 @@ def vault_server(
         def memory_write(name: str, content: str, expected_revision: str | None = None) -> MemoryWrite:
             with _tool_errors():
                 return write_memory(vault, memory_dir, name, content, expected_revision)
+
+        @server.tool(name='obsidian.memory_delete', description=(
+            'Call obsidian.agentsmd before your first edit. Hide a memory note and remove its line from '
+            'MEMORY.md. Pass the revision from obsidian.memory_read. The hidden copy stays beside the notes.'
+        ))
+        def memory_delete(name: str, expected_revision: str) -> MemoryDelete:
+            with _tool_errors():
+                return delete_memory(vault, memory_dir, name, expected_revision)
+
+        @server.tool(name='obsidian.memory_index_write', description=(
+            'Call obsidian.agentsmd before your first edit. Replace MEMORY.md as a whole. Every line must '
+            'name an existing memory note and every note needs exactly one line. Pass the revision from '
+            'obsidian.memory_read for MEMORY.md.'
+        ))
+        def memory_index_write(content: str, expected_revision: str | None = None) -> MutationResult:
+            with _tool_errors():
+                return write_memory_index(vault, memory_dir, content, expected_revision)
 
     @server.tool(name='obsidian.read', description='Read a UTF-8 text file at a vault-relative path and return its revision.')
     def read(path: str) -> TextFile:

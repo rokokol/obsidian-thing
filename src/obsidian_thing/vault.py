@@ -223,6 +223,21 @@ class Vault:
     def agent_write(self, path: str, content: str, expected_revision: str | None) -> MutationResult:
         return self._write(self._agent_parts(path), path, content, expected_revision, note_checks=False)
 
+    def agent_delete(self, path: str, expected_revision: str) -> dict[str, str]:
+        parts = self._agent_parts(path)
+        name = parts[-1]
+        # The file keeps a hidden name beside the others, so a delete leaves a copy to restore
+        hidden = f'.{name}.{uuid4().hex[:8]}'
+        try:
+            with self._mutation_lock, self._directory(parts[:-1]) as parent:
+                self._check_revision(path, parent, name, expected_revision)
+                os.rename(name, hidden, src_dir_fd=parent, dst_dir_fd=parent)
+        except OSError:
+            raise VaultError('Cannot delete the agent file') from None
+        return {'path': path, 'revision': expected_revision,
+                'trash': '/'.join((*parts[:-1], hidden)),
+                }
+
     def _read_text(self, path: str, fd: int) -> tuple[TextFile, int]:
         mode = os.fstat(fd).st_mode
         if not stat.S_ISREG(mode):

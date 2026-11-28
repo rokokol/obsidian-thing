@@ -496,7 +496,8 @@ def test_tools_read_live_files_in_the_selected_vault(endpoint, mode, version):
                                 'obsidian.memory_list', 'obsidian.memory_read'}
                     if name == 'first':
                         expected.update(('obsidian.write', 'obsidian.update', 'obsidian.delete', 'obsidian.rename',
-                                         'obsidian.canvas_edit', 'obsidian.base_edit', 'obsidian.memory_write'))
+                                         'obsidian.canvas_edit', 'obsidian.base_edit', 'obsidian.memory_write',
+                                         'obsidian.memory_delete', 'obsidian.memory_index_write'))
                     assert {tool.name for tool in tools.tools} == expected
                     allowed = await session.call_tool('obsidian.allowed')
                     assert set(allowed.structured_content['paths']) == {'notes', 'AGENTS.md', 'GEMINI.md'}

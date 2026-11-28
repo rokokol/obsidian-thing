@@ -36,6 +36,7 @@
 - Record embedding calls and USD costs in a separate SQLite journal
 - Report index coverage, the embedding queue, the last full scan, the model profile and recorded costs with `obsidian.status`
 - Find indexed notes by tag, alias and YAML property with `obsidian.find`. The tool does not need embeddings
+- Remove a memory note and its line in `MEMORY.md` with `obsidian.memory_delete`, and repair the whole index with `obsidian.memory_index_write`
 - Draw a file and its nearest neighbors on two axes with `obsidian.map`. The tool keeps the vector rank and requires the plugin client header
 
 ## [0.1.0] - 2026-11-19

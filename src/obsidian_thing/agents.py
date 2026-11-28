@@ -41,6 +41,11 @@ class MemoryWrite(MutationResult):
     index_revision: NotRequired[str]
 
 
+class MemoryDelete(MutationResult):
+    trash: str
+    index_revision: NotRequired[str]
+
+
 def _fields(text: str) -> dict[str, object]:
     state, root = frontmatter_nodes(text)
     if state is not FrontmatterState.VALID or root is None:
@@ -160,6 +165,74 @@ def _index_text(text: str | None, filename: str, name: str, description: str) ->
     return '\n'.join(lines) + '\n'
 
 
+def _read_index(vault: Vault, path: str) -> TextFile | None:
+    try:
+        return vault.agent_read(path)
+    except VaultError:
+        return None
+
+
+def _entries(text: str) -> list[tuple[str, str]]:
+    found = []
+    for line in text.splitlines():
+        match = _INDEX_LINE.match(line)
+        if match:
+            found.append((match['title'], match['target']))
+    return found
+
+
+def _drop_line(text: str, filename: str) -> str | None:
+    lines = text.splitlines()
+    kept = []
+    for line in lines:
+        match = _INDEX_LINE.match(line)
+        if match is not None and match['target'] == filename:
+            continue
+        kept.append(line)
+    if len(kept) == len(lines):
+        return None
+    while kept and not kept[-1].strip():
+        kept.pop()
+    return '\n'.join(kept) + '\n'
+
+
+def _memory_names(vault: Vault, directory: str) -> list[str]:
+    return [name for name, _, is_file in vault.agent_entries(directory)
+            if is_file and name.endswith('.md') and name != MEMORY_INDEX]
+
+
+def delete_memory(vault: Vault, directory: str, name: str,
+                  expected_revision: str) -> MemoryDelete:
+    filename = _memory_file(name)
+    result = vault.agent_delete(f'{directory}/{filename}', expected_revision)
+    index_path = f'{directory}/{MEMORY_INDEX}'
+    index = _read_index(vault, index_path)
+    if index is not None:
+        text = _drop_line(index['content'], filename)
+        if text is not None:
+            written = vault.agent_write(index_path, text, index['revision'])
+            return {'path': result['path'], 'revision': result['revision'], 'trash': result['trash'],
+                    'index_revision': written['revision']}
+    return {'path': result['path'], 'revision': result['revision'], 'trash': result['trash']}
+
+
+def write_memory_index(vault: Vault, directory: str, content: str,
+                       expected_revision: str | None = None) -> MutationResult:
+    entries = _entries(content)
+    targets = [target for _, target in entries]
+    names = _memory_names(vault, directory)
+    duplicates = sorted({target for target in targets if targets.count(target) > 1})
+    if duplicates:
+        raise VaultError('These notes appear more than once in the index: ' + ', '.join(duplicates))
+    unknown = sorted(set(targets) - set(names))
+    if unknown:
+        raise VaultError('These entries name no memory note: ' + ', '.join(unknown))
+    missing = sorted(set(names) - set(targets))
+    if missing:
+        raise VaultError('These notes have no line in the index: ' + ', '.join(missing))
+    return vault.agent_write(f'{directory}/{MEMORY_INDEX}', content, expected_revision)
+
+
 def write_memory(vault: Vault, directory: str, name: str, content: str,
                  expected_revision: str | None = None) -> MemoryWrite:
     filename = _memory_file(name)
@@ -170,8 +243,7 @@ def write_memory(vault: Vault, directory: str, name: str, content: str,
     vault.ensure_agent_dir(directory)
     result = vault.agent_write(f'{directory}/{filename}', content, expected_revision)
     index_path = f'{directory}/{MEMORY_INDEX}'
-    index = next((vault.agent_read(index_path) for entry, is_dir, is_file in vault.agent_entries(directory)
-                  if entry == MEMORY_INDEX and is_file), None)
+    index = _read_index(vault, index_path)
     text = _index_text(index['content'] if index is not None else None, filename,
                        str(fields.get('name') or filename[:-3]), description)
     try:

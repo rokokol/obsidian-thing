@@ -2,8 +2,9 @@ from hashlib import sha256
 
 import pytest
 
-from obsidian_thing.agents import (DEFAULT_INSTRUCTIONS, list_memory, list_skills, read_instructions,
-                                   read_memory, read_skill, write_memory)
+from obsidian_thing.agents import (DEFAULT_INSTRUCTIONS, delete_memory, list_memory, list_skills,
+                                   read_instructions, read_memory, read_skill, write_memory,
+                                   write_memory_index)
 from obsidian_thing.vault import Vault, VaultError
 
 SKILLS = '.agents/skills'
@@ -200,3 +201,56 @@ def test_memory_write_ignores_note_rules(tmp_path):
     vault = make_vault(tmp_path, checks={'default_quotes': '""', 'trailing_periods': True})
     content = '---\nname: reference-a\ndescription: A fact\n---\nQuote "here".\n'
     assert write_memory(vault, MEMORY, 'reference-a', content)['revision']
+
+
+def test_memory_delete_hides_the_note_and_drops_its_line(tmp_path):
+    vault = make_vault(tmp_path)
+    content = '---\nname: reference-a\ndescription: A fact\n---\nBody\n'
+    write_memory(vault, MEMORY, 'reference-a', content)
+    write_memory(vault, MEMORY, 'reference-b', '---\nname: reference-b\ndescription: B fact\n---\nBody\n')
+    revision = sha256(content.encode()).hexdigest()
+    result = delete_memory(vault, MEMORY, 'reference-a', revision)
+    assert result['path'] == f'{MEMORY}/reference-a.md'
+    assert result['trash'].startswith(f'{MEMORY}/.reference-a.md.')
+    assert (vault.root / result['trash']).read_text() == content
+    assert not (vault.root / MEMORY / 'reference-a.md').exists()
+    assert [item['name'] for item in list_memory(vault, MEMORY)['memories']] == ['reference-b']
+    index = (vault.root / MEMORY / 'MEMORY.md').read_text()
+    assert 'reference-a.md' not in index and 'reference-b.md' in index
+    with pytest.raises(VaultError):
+        read_memory(vault, MEMORY, 'reference-a')
+
+
+def test_memory_delete_checks_the_revision_and_tolerates_no_index_line(tmp_path):
+    vault = make_vault(tmp_path)
+    content, _ = write_memory_note(vault, 'reference-a')
+    with pytest.raises(VaultError, match='revision'):
+        delete_memory(vault, MEMORY, 'reference-a', '0' * 64)
+    assert (vault.root / MEMORY / 'reference-a.md').exists()
+    result = delete_memory(vault, MEMORY, 'reference-a', sha256(content.encode()).hexdigest())
+    assert 'index_revision' not in result
+
+
+def test_memory_index_write_validates_the_whole_list(tmp_path):
+    vault = make_vault(tmp_path)
+    write_memory_note(vault, 'reference-a')
+    write_memory_note(vault, 'reference-b')
+    (vault.root / MEMORY / 'MEMORY.md').write_text('# Memory index\n\n- [A](reference-a.md) — A\n')
+    with pytest.raises(VaultError, match='at least twice|more than once'):
+        write_memory_index(vault, MEMORY, '- [A](reference-a.md) — A\n- [A](reference-a.md) — A\n')
+    with pytest.raises(VaultError, match='no memory note'):
+        write_memory_index(vault, MEMORY, '- [Gone](gone.md) — Gone\n- [A](reference-a.md) — A\n'
+                          '- [B](reference-b.md) — B\n')
+    with pytest.raises(VaultError, match='no line'):
+        write_memory_index(vault, MEMORY, '- [A](reference-a.md) — A\n')
+    fixed = '# Memory index\n\n- [B](reference-b.md) — B\n- [A](reference-a.md) — A\n'
+    revision = sha256((vault.root / MEMORY / 'MEMORY.md').read_bytes()).hexdigest()
+    assert write_memory_index(vault, MEMORY, fixed, revision)['revision'] == sha256(fixed.encode()).hexdigest()
+    assert (vault.root / MEMORY / 'MEMORY.md').read_text() == fixed
+
+
+def test_memory_index_write_creates_the_index(tmp_path):
+    vault = make_vault(tmp_path)
+    write_memory_note(vault, 'reference-a')
+    content = '# Memory index\n\n- [reference-a](reference-a.md) — A fact\n'
+    assert write_memory_index(vault, MEMORY, content)['revision'] == sha256(content.encode()).hexdigest()

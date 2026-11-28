@@ -32,9 +32,15 @@ A memory note is a Markdown file under `memory_dir` with YAML frontmatter. The `
 | `obsidian.memory_list` | Every note with its name, description, type, path and revision |
 | `obsidian.memory_read` | One note by name without the extension. `MEMORY.md` reads the index |
 | `obsidian.memory_write` | Create or replace a note. This tool requires a writable vault |
+| `obsidian.memory_delete` | Hide a note and remove its line from `MEMORY.md`. This tool requires a writable vault |
+| `obsidian.memory_index_write` | Replace `MEMORY.md` as a whole. This tool requires a writable vault |
 
 `obsidian.memory_write` takes the revision from `obsidian.memory_read` and writes the note. It then writes the line of the note in `MEMORY.md` and returns `index_revision`. The index keeps the title it already has and takes the summary from the `description` property. A note without a description is refused
 
 The server creates the memory directory together with the note. It saves the note before the index line, so a failed index write keeps the note and returns an error
+
+`obsidian.memory_delete` takes the revision from `obsidian.memory_read` and renames the note to a hidden name beside the others, so the file stays restorable, then removes its line from `MEMORY.md`. A note with no line in the index is removed without touching the index
+
+`obsidian.memory_index_write` takes the revision of `MEMORY.md` from `obsidian.memory_read`. It refuses the content when a line names no memory note, when a note has no line, or when a line appears twice, and it changes nothing in that case. Use it to reorder the index or to repair it after a note was removed with the file tools
 
 The vault rules and the write checker do not apply to these files, because a memory note has no heading and no note text. The frontmatter check of `protect_frontmatter` still applies

@@ -53,6 +53,7 @@
               pillow
               pypdf
               prometheus-client
+              regex
               ruamel-yaml
               starlette
               uvicorn

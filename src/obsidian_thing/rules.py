@@ -1,5 +1,6 @@
 import re
 from collections import Counter
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Literal
 from unicodedata import category
@@ -97,17 +98,20 @@ _TAG_MARKDOWN = _markdown_parser()
 _TAG_MARKDOWN.inline.ruler.before('text', 'obsidian_tag', _tag_inline)
 
 
-def _tag_findings(text: str) -> list[Finding]:
-    found = []
+def iter_inline_tags(text: str) -> Iterator[tuple[str, int]]:
     for block in _TAG_MARKDOWN.parse(text.removeprefix('\ufeff')):
         if block.type != 'inline':
             continue
         line = (block.map or [0])[0] + 1
         for token in block.children or ():
             if token.type == 'obsidian_tag':
-                found.append(Finding('prevent_inline_tags', token.content, line, 'error',
-                                     'Put tags in YAML or escape a literal hash or use inline code'))
-    return found
+                yield token.content, line
+
+
+def _tag_findings(text: str) -> list[Finding]:
+    return [Finding('prevent_inline_tags', tag, line, 'error',
+                    'Put tags in YAML or escape a literal hash or use inline code')
+            for tag, line in iter_inline_tags(text)]
 
 
 def _blank_inline_code(line: str) -> str:

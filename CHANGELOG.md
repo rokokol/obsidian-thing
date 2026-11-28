@@ -31,7 +31,8 @@
 - Index Markdown and plain text for semantic search with Ollama or opt-in OpenRouter
 - Record embedding calls and USD costs in a separate SQLite journal
 - Report index coverage, the embedding queue, the last full scan, the model profile and recorded costs with `obsidian.status`
-- Draw a file and its nearest neighbours on two axes with `obsidian.map`, ranked in the vector space and not by the drawn position
+- Find indexed notes by tag, alias and YAML property with `obsidian.find`. The tool does not need embeddings
+- Draw a file and its nearest neighbors on two axes with `obsidian.map`. The tool keeps the vector rank and requires the plugin client header
 
 ## [0.1.0] - 2026-11-19
 

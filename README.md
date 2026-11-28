@@ -8,11 +8,13 @@ Obsidian Thing serves Obsidian vaults over MCP Streamable HTTP. Each vault has i
 
 Copy [`config.example.toml`](config.example.toml) to `config.toml`. Set the vault root and the paths that each client may read. An allowed directory grants access to its subtree. Use `"."` to allow the whole vault, except for hidden paths and symbolic links
 
-Set the environment variable named by `token_env` to a random secret. Use a different token for each vault that needs separate access. Start the server with:
+Set the environment variable named by `token_env` to a random secret. Use a different token for each vault that needs separate access. Start the native package with Nix:
 
 ```sh
-uv run --locked obsidian-thing --config config.toml
+nix run . -- --config config.toml
 ```
+
+For a local run without Nix, use `uv run --locked obsidian-thing --config config.toml`
 
 Use the listen address printed by the server and the endpoint `/vaults/<vault_id>/mcp`. Send `Authorization: Bearer <token>` with each request. For remote access, put the server behind HTTPS and set `allowed_hosts` in the TOML file to the host names that the proxy forwards
 
@@ -33,17 +35,27 @@ To restore a deletion, read `$trash_dir/<trash_id>/path` for the original vault-
 - [Example checker](examples/checker.py): a starting point for vault-specific rules
 - [NixOS service](docs/nixos.md): configure the MCP server as a system service
 
-## Run with Nix or Docker
+## Build the native package with Nix
 
 Build from a Git checkout with secrets excluded from tracked files. Without Git, copy only `flake.nix`, `flake.lock`, `nixos-module.nix`, `pyproject.toml`, `VERSION`, and `src/` to a clean directory first. Nix can copy an entire local source tree to its store
 
 ```sh
-nix run . -- --config /absolute/path/to/config.toml
-nix build .#docker
-docker load --input result
+nix build .#default
+./result/bin/obsidian-thing --config /absolute/path/to/config.toml
 ```
 
-The image contains the same Nix package as the native command. It does not need a base image or a Nix daemon at runtime
+For a persistent deployment, see the [NixOS service](docs/nixos.md)
+
+## Run in Docker
+
+Use the [published image](https://github.com/rokokol/obsidian-thing/pkgs/container/obsidian-thing) or build a local image with a separate output link:
+
+```sh
+nix build .#docker --out-link result-docker
+docker load --input result-docker
+```
+
+The image contains the native package. It does not need a Nix daemon at runtime
 
 For Docker, set the vault `root` in the config to `/vault`. Mount that path and the config as read-only volumes. Remove `:ro` from the vault mount only if the vault needs writes. Export the variable named by `token_env` before you start the container
 

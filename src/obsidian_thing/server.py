@@ -3,8 +3,11 @@ import re
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from hmac import compare_digest
 from pathlib import Path
+from typing import Any
 
 from mcp.server import MCPServer
+from mcp.server.context import CallNext, HandlerResult, ServerRequestContext
+from mcp.types import CallToolResult, TextContent
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
@@ -53,11 +56,26 @@ class RequireBearer:
         await self.app(scope, receive, send)
 
 
+_MAP_TOOL = 'obsidian.map'
+
+
+async def _plugin_tools(ctx: ServerRequestContext[Any, Any], call_next: CallNext) -> HandlerResult:
+    headers = getattr(ctx.request, 'headers', {})
+    if headers.get('X-Obsidian-Thing-Client') == 'plugin':
+        return await call_next(ctx)
+    if ctx.method == 'tools/call' and ctx.params and ctx.params.get('name') == _MAP_TOOL:
+        return CallToolResult(is_error=True, content=[TextContent(type='text', text='Unknown tool: ' + _MAP_TOOL)])
+    result = await call_next(ctx)
+    if ctx.method == 'tools/list' and isinstance(result, dict):
+        return {**result, 'tools': [tool for tool in result['tools'] if tool['name'] != _MAP_TOOL]}
+    return result
+
+
 def vault_server(
     name: str, vault: Vault, *, writable: bool = False, trash_dir: Path | None = None,
     search: SearchIndex | None = None, iconic_offline: bool = False, fsrs_dictionary: bool = False,
 ) -> MCPServer:
-    server = MCPServer(name)
+    server = MCPServer(name, middleware=[_plugin_tools])
 
     @server.tool(name='obsidian.allowed', description='List allowed paths relative to this vault.')
     def allowed() -> dict[str, list[str]]:
@@ -205,6 +223,20 @@ def vault_server(
             with _tool_errors():
                 return search.query(text, limit)
 
+        @server.tool(name='obsidian.find', description=(
+            'Find indexed Markdown notes that match all filters. '
+            'The optional filename_regex matches the name with its extension, without folders. '
+            'Tags match descendants. Aliases match full values without regard to case. '
+            'Set alias_property to look up aliases in a different YAML property. '
+            'Use null to check for a property without a value filter.'
+        ))
+        def find(tags: list[str] | None = None, aliases: list[str] | None = None,
+                 properties: dict[str, str | None] | None = None, alias_property: str = 'aliases',
+                 filename_regex: str | None = None, limit: int = 10) -> dict[str, list[str]]:
+            with _tool_errors():
+                return search.find(tags=tags, aliases=aliases, properties=properties,
+                                   alias_property=alias_property, filename_regex=filename_regex, limit=limit)
+
         @server.tool(name='obsidian.status', description=(
             'Report index coverage, the pending embedding queue, the last full scan, the embedding model '
             'profile, and recorded costs by period and by day. Omit embeddings and costs when this vault '
@@ -227,7 +259,7 @@ def vault_server(
                     return search.related(path, limit, min_score, section_line=section_line, include_paths=include_paths,
                                           mime_types=mime_types, exclude_linked=exclude_linked)
 
-            @server.tool(name='obsidian.map', description=(
+            @server.tool(name=_MAP_TOOL, description=(
                 'Draw a text file or an enabled attachment and its nearest indexed neighbours on two axes. '
                 'Rank the neighbours by their vectors, not by the drawn coordinates. '
                 'Filter results by vault-relative paths, MIME types, or outgoing links.'

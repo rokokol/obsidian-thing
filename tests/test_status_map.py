@@ -104,8 +104,8 @@ def test_status_reports_coverage_queue_scan_and_profile(tmp_path, monkeypatch):
         'source.md': 'source anchor', 'near.md': 'near note', 'skip.tmp.md': 'skipped',
         'notes/in.md': 'near in scope',
     }, embeddings={'include_paths': ['source.md', 'near.md']}, indexing={'exclude': ['*.tmp.md']})
-    index.reconcile_local()
     index.index('source.md')
+    index.reconcile_local()
 
     report = index.status()
     assert set(report) == {'index', 'embeddings', 'spend'}
@@ -123,8 +123,11 @@ def test_status_reports_coverage_queue_scan_and_profile(tmp_path, monkeypatch):
     assert datetime.fromisoformat(last_scan).tzinfo is not None
 
     (root / 'fresh.md').write_text('fresh note')
-    assert index.status()['index']['files'] == 4
-    assert index.status()['index']['unindexed'] == 1
+    assert index.status()['index']['files'] == 3
+    index.reconcile_local()
+    refreshed = index.status()['index']
+    assert refreshed['files'] == 4
+    assert refreshed['unindexed'] == 0
 
     profile = report.get('embeddings')
     assert profile is not None
@@ -204,6 +207,7 @@ def rpc(config):
                 'Authorization': 'Bearer synthetic-token',
                 'Accept': 'application/json, text/event-stream',
                 'MCP-Protocol-Version': '2025-11-25',
+                'X-Obsidian-Thing-Client': 'plugin',
             }, json=dict(jsonrpc='2.0', id=1, method=method, params=params))
             assert response.status_code == 200
             return response.json()['result']
@@ -240,28 +244,33 @@ def test_status_and_map_follow_the_server_settings(endpoint):
 
 def test_partial_scan_keeps_the_previous_scan_time(tmp_path, monkeypatch):
     root, state, index = _index(tmp_path, monkeypatch)
+    assert index.embedder is not None
     index.reconcile_local()
     with sqlite3.connect(index.database) as db:
-        db.execute("UPDATE meta SET value = '2020-01-01T00:00:00Z' WHERE key = 'last_full_scan'")
+        db.execute("UPDATE coverage SET at = '2020-01-01T00:00:00Z' WHERE mode = ? AND profile = ?",
+                   (int(index.section_chunks), index.embedder.profile))
     index.reconcile_local(['source.md'])
     assert index.status()['index']['last_full_scan'] == '2020-01-01T00:00:00Z'
 
 
-def test_status_drops_every_count_of_a_deleted_file(tmp_path, monkeypatch):
+def test_status_keeps_the_snapshot_of_a_deleted_file_until_the_next_scan(tmp_path, monkeypatch):
     root, state, index = _index(tmp_path, monkeypatch)
-    index.reconcile_local()
     index.index('source.md')
-    assert index.status()['index']['pending'] == 1
+    index.reconcile_local()
+    first = index.status()['index']
+    assert first['pending'] == 1
     (root / 'near.md').unlink()
+    assert index.status()['index'] == first
+    index.reconcile_local()
     status = index.status()['index']
     assert (status['files'], status['indexed'], status['embedded'], status['pending']) == (1, 1, 1, 0)
 
 
 def test_status_counts_a_file_without_vectors_as_unembedded(tmp_path, monkeypatch):
     root, state, index = _index(tmp_path, monkeypatch, files={'source.md': 'source word', 'empty.md': ''})
-    index.reconcile_local()
     assert index.index('source.md')['chunks'] == 1
     assert index.index('empty.md')['chunks'] == 0
+    index.reconcile_local()
     status = index.status()['index']
     assert (status['indexed'], status['embedded']) == (2, 1)
 
@@ -301,11 +310,16 @@ def test_map_compares_mean_directions_not_vector_sums(tmp_path, monkeypatch):
     assert [(point['x'], point['y']) for point in points] == [(0.0, 0.0), (0.0, 0.0)]
 
 
-def test_status_reports_a_broken_gitignore_instead_of_hiding_files(tmp_path, monkeypatch):
+def test_status_keeps_the_snapshot_when_the_gitignore_is_broken(tmp_path, monkeypatch):
     root, state, index = _index(tmp_path, monkeypatch, indexing={'respect_gitignore': True})
+    index.reconcile_local()
+    first = index.status()['index']
     (root / '.gitignore').write_text('!\n')
-    with pytest.raises(ValueError, match='ignore rules'):
-        index.status()
+    index.reconcile_local()
+    after = index.status()['index']
+    assert after['last_full_scan'] == first['last_full_scan']
+    assert (after['files'], after['excluded'], after['indexed'], after['embedded']) == (
+        first['files'], first['excluded'], first['indexed'], first['embedded'])
 
 
 def test_centroids_refuse_a_vector_of_the_wrong_size(tmp_path, monkeypatch):

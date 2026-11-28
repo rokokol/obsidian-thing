@@ -12,7 +12,10 @@ from hashlib import sha256
 from itertools import islice
 from pathlib import Path
 from threading import Lock
+from time import monotonic
 from typing import NotRequired, TypedDict
+
+import regex
 
 from .embeddings import Embedder, EmbeddingDescription, EmbeddingError, SpendReport
 from .index_policy import ExclusionError, IndexPolicy
@@ -20,6 +23,7 @@ from .metrics import Metrics
 from .projection import project
 from .search_attachments import ATTACHMENT_LIMIT, SUFFIX_TYPES, TEXT_TYPES, attachment_parts, mime_type
 from .search_chunks import Chunk, chunks, section_lines
+from .search_metadata import fold, metadata_rows, tag_key
 from .vault import TextFile, Vault, VaultError, _parts
 
 
@@ -55,13 +59,15 @@ class Map(TypedDict):
     dimensions: int
 
 
+# Coverage counts describe one successful full reconciliation. They stay null until
+# one completes for the current split and embedding profile.
 class IndexStatus(TypedDict):
     mode: str
-    files: int
-    excluded: int
-    indexed: int
-    unindexed: int
-    embedded: int
+    files: int | None
+    excluded: int | None
+    indexed: int | None
+    unindexed: int | None
+    embedded: int | None
     pending: int
     last_full_scan: str | None
 
@@ -164,8 +170,11 @@ class SearchIndex:
                     profile TEXT NOT NULL, mode INTEGER NOT NULL, path TEXT NOT NULL, revision TEXT NOT NULL,
                     PRIMARY KEY (profile, mode, path)
                 );
-                CREATE TABLE IF NOT EXISTS meta (
-                    key TEXT PRIMARY KEY, value TEXT NOT NULL
+                CREATE TABLE IF NOT EXISTS coverage (
+                    mode INTEGER NOT NULL, profile TEXT NOT NULL,
+                    files INTEGER NOT NULL, excluded INTEGER NOT NULL,
+                    indexed INTEGER NOT NULL, embedded INTEGER NOT NULL,
+                    at TEXT NOT NULL, PRIMARY KEY (mode, profile)
                 );
                 CREATE TABLE IF NOT EXISTS lexical_chunks (
                     id INTEGER PRIMARY KEY, mode INTEGER NOT NULL, path TEXT NOT NULL,
@@ -173,6 +182,12 @@ class SearchIndex:
                     line_end INTEGER NOT NULL, text TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS lexical_paths ON lexical_chunks (mode, path);
+                CREATE TABLE IF NOT EXISTS note_metadata (
+                    mode INTEGER NOT NULL, path TEXT NOT NULL, kind TEXT NOT NULL,
+                    name TEXT NOT NULL, value TEXT NOT NULL,
+                    PRIMARY KEY (mode, path, kind, name, value)
+                );
+                CREATE INDEX IF NOT EXISTS metadata_lookup ON note_metadata (mode, kind, name, value, path);
                 CREATE VIRTUAL TABLE IF NOT EXISTS lexical_fts USING fts5(
                     text, content='lexical_chunks', content_rowid='id', tokenize='unicode61 tokenchars _'
                 );
@@ -215,7 +230,7 @@ class SearchIndex:
             raise VaultError('The queued revision is no longer current')
         fragments = self._fragments(note)
         with self.local_lock:
-            self._index_lexical(db, path, revision, fragments)
+            self._index_lexical(db, note, fragments)
         return revision, fragments
 
     def index(self, path: str, *, operation: str = 'index', queued_revision: str | None = None,
@@ -288,9 +303,7 @@ class SearchIndex:
         if self.embedder is None or not self.embedder.can_send:
             return 0
         with closing(sqlite3.connect(self.database)) as db:
-            count, = db.execute(f'SELECT count(*) FROM ({self._pending_rows})',
-                                (self.section_chunks, self.embedder.profile)).fetchone()
-        return count
+            return self._queue_depth(db)
 
     def pending(self) -> list[tuple[str, str]]:
         if self.embedder is None or not self.embedder.can_send:
@@ -331,6 +344,9 @@ class SearchIndex:
                         stop: Callable[[], bool] | None = None) -> dict[str, str]:
         full_scan = paths is None
         completed = True
+        visible: set[str] = set()
+        candidates: set[str] = set()
+        excluded = 0
         with closing(sqlite3.connect(self.database)) as db:
             if paths is None:
                 visible = set(self.vault.visible_files())
@@ -345,6 +361,17 @@ class SearchIndex:
                 if stop is not None and stop():
                     completed = False
                     break
+                if full_scan and path in visible:
+                    try:
+                        kind = self._coverage_kind(path)
+                    except VaultError:
+                        completed = False
+                        break
+                    else:
+                        if kind == 'candidate':
+                            candidates.add(path)
+                        elif kind == 'excluded':
+                            excluded += 1
                 if not self._supports_text(path):
                     self.vault.graph.refresh(path)
                     if self.embedder is None or not self.embedder.can_send:
@@ -384,14 +411,17 @@ class SearchIndex:
                         self._check_local_path(path)
                         revision = note['revision']
                         if not self._lexical_is_current(db, path, revision):
-                            self._index_lexical(db, path, revision, self._fragments(note))
+                            self._index_lexical(db, note, self._fragments(note))
                         revisions[path] = revision
                     except VaultError:
                         self._drop_path(db, path)
             if full_scan and completed:
+                indexed, embedded = self._coverage_counts(db, candidates)
+                profile = self.embedder.profile if self.embedder is not None else ''
                 with db:
-                    db.execute('INSERT OR REPLACE INTO meta VALUES (?, ?)', (
-                        'last_full_scan', datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')))
+                    db.execute('INSERT OR REPLACE INTO coverage VALUES (?, ?, ?, ?, ?, ?, ?)', (
+                        self.section_chunks, profile, len(candidates), excluded, indexed, embedded,
+                        datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')))
             return revisions
 
     @staticmethod
@@ -400,19 +430,27 @@ class SearchIndex:
             db.execute('DELETE FROM local_files WHERE path = ?', (path,))
             db.execute('DELETE FROM embedded_files WHERE path = ?', (path,))
             db.execute('DELETE FROM lexical_chunks WHERE path = ?', (path,))
+            db.execute('DELETE FROM note_metadata WHERE path = ?', (path,))
             db.execute('DELETE FROM section_chunks WHERE path = ?', (path,))
 
     def _lexical_is_current(self, db: sqlite3.Connection, path: str, revision: str) -> bool:
-        return db.execute('SELECT 1 FROM local_files WHERE mode = ? AND path = ? AND revision = ?',
-                          (self.section_chunks, path, revision)).fetchone() is not None
+        return db.execute('''
+            SELECT 1 FROM local_files AS f WHERE mode = ? AND path = ? AND revision = ?
+            AND (NOT ? OR EXISTS (SELECT 1 FROM note_metadata AS m
+                WHERE m.mode = f.mode AND m.path = f.path AND m.kind = 'revision-marker'))
+        ''', (self.section_chunks, path, revision, mime_type(path) == 'text/markdown')).fetchone() is not None
 
-    def _index_lexical(self, db: sqlite3.Connection, path: str, revision: str, fragments: list[Chunk]) -> None:
+    def _index_lexical(self, db: sqlite3.Connection, note: TextFile, fragments: list[Chunk]) -> None:
+        path, revision = note['path'], note['revision']
         key = self.section_chunks, path
         if self._lexical_is_current(db, path, revision):
             return
         if not self._is_current(path, revision, local=True):
             raise VaultError('The file changed during indexing; try again')
+        rows = metadata_rows(note['content']) if mime_type(path) == 'text/markdown' else ()
         with db:
+            db.execute('DELETE FROM note_metadata WHERE mode = ? AND path = ?', key)
+            db.executemany('INSERT INTO note_metadata VALUES (?, ?, ?, ?, ?)', ((*key, *row) for row in rows))
             db.execute('DELETE FROM lexical_chunks WHERE mode = ? AND path = ?', key)
             db.executemany('''
                 INSERT INTO lexical_chunks (mode, path, revision, headings, line_start, line_end, text)
@@ -476,30 +514,25 @@ class SearchIndex:
         return self._match(self.embedder.profile, vectors, limit, threshold, accepts=accepts, group_sections=True)
 
     def status(self) -> Status:
-        files, excluded = self._candidates()
+        mode = self.section_chunks
+        profile = self.embedder.profile if self.embedder is not None else ''
         with closing(sqlite3.connect(self.database)) as db:
-            local = {path for path, in db.execute(
-                'SELECT path FROM local_files WHERE mode = ?', (self.section_chunks,))}
-            embedded = set()
-            if self.embedder is not None:
-                embedded = {path for path, in db.execute('''
-                    SELECT e.path FROM embedded_files AS e
-                    WHERE e.profile = ? AND e.mode = ? AND EXISTS (
-                        SELECT 1 FROM section_chunks AS c
-                        WHERE c.profile = e.profile AND c.mode = e.mode AND c.path = e.path
-                          AND c.revision = e.revision
-                    )
-                ''', (self.embedder.profile, self.section_chunks))}
-            last, = db.execute("SELECT value FROM meta WHERE key = 'last_full_scan'").fetchone() or (None,)
-        candidates = set(files)
+            row = db.execute('SELECT files, excluded, indexed, embedded, at FROM coverage '
+                             'WHERE mode = ? AND profile = ?', (mode, profile)).fetchone()
+            pending = self._queue_depth(db)
+        if row is None:
+            files = excluded = indexed = unindexed = embedded = last = None
+        else:
+            files, excluded, indexed, embedded, last = row
+            unindexed = files - indexed
         report: Status = {'index': {
-            'mode': 'sections' if self.section_chunks else 'size',
-            'files': len(files),
+            'mode': 'sections' if mode else 'size',
+            'files': files,
             'excluded': excluded,
-            'indexed': len(candidates & local),
-            'unindexed': len(candidates - local),
-            'embedded': len(candidates & embedded),
-            'pending': self._queued(),
+            'indexed': indexed,
+            'unindexed': unindexed,
+            'embedded': embedded,
+            'pending': pending,
             'last_full_scan': last,
         }}
         if self.embedder is not None:
@@ -524,43 +557,53 @@ class SearchIndex:
             return None
         return info.st_size if stat_module.S_ISREG(info.st_mode) else None
 
-    def _candidates(self) -> tuple[list[str], int]:
-        # An attachment joins the count only when the provider can send its bytes
+    def _coverage_kind(self, path: str) -> str:
+        # Type and scope decide the denominator; policy exclusion is counted apart.
+        mime = mime_type(path)
+        text = mime in TEXT_TYPES
         can_embed = self.embedder is not None and self.embedder.can_send
-        files: list[str] = []
-        excluded = 0
-        for path in self.vault.visible_files():
-            mime = mime_type(path)
-            text = mime in TEXT_TYPES
-            if not text and not (can_embed and mime in self.allowed_mime_types
-                                 and self._in_scope(_parts(path))):
-                continue
-            try:
-                self.policy.check(path)
-            except ExclusionError:
-                excluded += 1
-                continue
-            size = self._size(path)
-            limit = self.vault.max_read_bytes if text else ATTACHMENT_LIMIT
-            if size is None or size > limit or (not text and not size):
-                continue
-            files.append(path)
-        return files, excluded
+        if not text and not (can_embed and mime in self.allowed_mime_types
+                             and self._in_scope(_parts(path))):
+            return 'skipped'
+        try:
+            self.policy.check(path)
+        except ExclusionError:
+            return 'excluded'
+        size = self._size(path)
+        limit = self.vault.max_read_bytes if text else ATTACHMENT_LIMIT
+        if size is None or size > limit or (not text and not size):
+            return 'skipped'
+        return 'candidate'
 
-    def _queued(self) -> int:
-        # The worker drops files outside the embedding scope, and reading them would make a status call expensive
+    def _coverage_counts(self, db: sqlite3.Connection, candidates: set[str]) -> tuple[int, int]:
+        if not candidates:
+            return 0, 0
+        local = {path for path, in db.execute(
+            'SELECT path FROM local_files WHERE mode = ?', (self.section_chunks,))}
+        embedded = 0
+        if self.embedder is not None:
+            embedded = len(candidates & {path for path, in db.execute('''
+                SELECT e.path FROM embedded_files AS e
+                WHERE e.profile = ? AND e.mode = ? AND EXISTS (
+                    SELECT 1 FROM section_chunks AS c
+                    WHERE c.profile = e.profile AND c.mode = e.mode AND c.path = e.path
+                      AND c.revision = e.revision
+                )
+            ''', (self.embedder.profile, self.section_chunks))})
+        return len(candidates & local), embedded
+
+    def _queue_depth(self, db: sqlite3.Connection) -> int:
+        # Count database rows in the configured embedding scope, not files on disk.
+        # An unreconciled deleted or policy-excluded path can stay in this count.
         if self.embedder is None or not self.embedder.can_send:
             return 0
         count = 0
-        with closing(sqlite3.connect(self.database)) as db:
-            for path, _ in db.execute(self._pending_rows, (self.section_chunks, self.embedder.profile)):
-                try:
-                    self._check_path(path)
-                except VaultError:
-                    continue
-                if self._size(path) is None:
-                    continue
-                count += 1
+        for path, _ in db.execute(self._pending_rows, (self.section_chunks, self.embedder.profile)):
+            try:
+                if mime_type(path) in self.allowed_mime_types and self._in_scope(_parts(path)):
+                    count += 1
+            except VaultError:
+                continue
         return count
 
     def map(self, path: str, limit: int = 10, min_score: float | None = None, *,
@@ -604,6 +647,75 @@ class SearchIndex:
             if length:
                 centroids[path] = [value / length for value in total]
         return centroids
+
+    def find(self, *, tags: list[str] | None = None, aliases: list[str] | None = None,
+             properties: dict[str, str | None] | None = None, alias_property: str = 'aliases',
+             filename_regex: str | None = None, limit: int = 10) -> dict[str, list[str]]:
+        self._validate_limit(limit)
+        tags, aliases, properties = tags or [], aliases or [], properties or {}
+        if not 1 <= len(tags) + len(aliases) + len(properties) + (filename_regex is not None) <= 32:
+            raise VaultError('Supply between 1 and 32 search filters')
+        pattern = None
+        if filename_regex is not None:
+            if not filename_regex or len(filename_regex) > 512:
+                raise VaultError('Use a non-empty filename regular expression of at most 512 characters')
+            try:
+                pattern = regex.compile(filename_regex)
+            except (regex.error, RecursionError):
+                raise VaultError('Invalid filename regular expression') from None
+        if not alias_property.strip() or any(not name.strip() for name in properties):
+            raise VaultError('Use non-empty property names')
+        clauses: list[str] = []
+        args: list[int | str] = []
+
+        def select(kind: str, name: str, value: str) -> None:
+            condition = 'value = ?'
+            keys = [value]
+            if kind == 'tag':
+                condition = '(value = ? OR (value >= ? AND value < ?))'
+                keys.extend((value + '/', value + '0'))
+            clauses.append('SELECT path FROM note_metadata WHERE mode = ? AND kind = ? AND name = ? AND ' + condition)
+            args.extend((int(self.section_chunks), kind, name, *keys))
+
+        for value in tags:
+            tag = tag_key(value)
+            if not tag:
+                raise VaultError('Use non-empty tags')
+            select('tag', '', tag)
+        for alias in aliases:
+            if not alias.strip():
+                raise VaultError('Use non-empty aliases')
+            select('folded', alias_property, fold(alias))
+        for name, value in properties.items():
+            select('present', name, '') if value is None else select('value', name, value)
+
+        if not clauses:
+            select('revision-marker', '', '')
+
+        paths: list[str] = []
+        regex_budget = 0.25
+        with closing(sqlite3.connect(self.database)) as db:
+            for path, revision in db.execute(f'''
+                WITH hits AS ({' INTERSECT '.join(clauses)})
+                SELECT f.path, f.revision FROM hits JOIN local_files AS f USING (path)
+                WHERE f.mode = ? ORDER BY f.path
+            ''', (*args, self.section_chunks)):
+                if pattern is not None:
+                    started = monotonic()
+                    try:
+                        match = pattern.search(path.rsplit('/', 1)[-1], timeout=regex_budget)
+                    except TimeoutError:
+                        raise VaultError('Filename regular expression exceeded the time limit') from None
+                    regex_budget -= monotonic() - started
+                    if regex_budget <= 0:
+                        raise VaultError('Filename regular expression exceeded the time limit')
+                    if match is None:
+                        continue
+                if self._is_current(path, revision, local=True):
+                    paths.append(path)
+                    if len(paths) == limit:
+                        break
+        return {'paths': paths}
 
     def query(self, text: str, limit: int) -> Matches:
         self._validate_limit(limit)

@@ -4,8 +4,8 @@ import os
 import sqlite3
 import time
 from base64 import b64encode
-from collections.abc import Iterable
 from contextlib import closing
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from hashlib import sha256
@@ -61,22 +61,28 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
-def totals(rows: Iterable[tuple[str, str, str | None]]) -> CostTotals:
-    reported = estimated = Decimal(0)
-    calls = unknown = local = 0
-    for _, kind, usd in rows:
-        calls += 1
-        if kind in ('reported', 'estimated') and usd is not None:
-            if kind == 'reported':
-                reported += Decimal(usd)
-            else:
-                estimated += Decimal(usd)
+@dataclass
+class _CostAccumulator:
+    calls: int = 0
+    reported: Decimal = Decimal(0)
+    estimated: Decimal = Decimal(0)
+    unknown: int = 0
+    local: int = 0
+
+    def add(self, kind: str, usd: str | None) -> None:
+        self.calls += 1
+        if kind == 'reported' and usd is not None:
+            self.reported += Decimal(usd)
+        elif kind == 'estimated' and usd is not None:
+            self.estimated += Decimal(usd)
         elif kind == 'local':
-            local += 1
+            self.local += 1
         else:
-            unknown += 1
-    return {'calls': calls, 'reported': str(reported), 'estimated': str(estimated),
-            'unknown_calls': unknown, 'local_calls': local}
+            self.unknown += 1
+
+    def totals(self) -> CostTotals:
+        return {'calls': self.calls, 'reported': str(self.reported), 'estimated': str(self.estimated),
+                'unknown_calls': self.unknown, 'local_calls': self.local}
 
 
 def _money(value):
@@ -265,21 +271,23 @@ class Embedder:
 
     def spend_report(self) -> SpendReport:
         now = datetime.now(timezone.utc)
-        with closing(sqlite3.connect(self.journal)) as db:
-            rows = db.execute('SELECT at, cost_kind, usd FROM calls ORDER BY at').fetchall()
-        periods: list[SpendPeriod] = []
-        for name, age in (*self.periods, ('all', None)):
-            cutoff = None if age is None else (now - age).strftime('%Y-%m-%d %H:%M:%S')
-            periods.append({'name': name, **totals(row for row in rows if cutoff is None or row[0] >= cutoff)})
+        periods = [(name, (now - age).strftime('%Y-%m-%d %H:%M:%S'), _CostAccumulator())
+                   for name, age in self.periods]
+        periods.append(('all', '', _CostAccumulator()))
         cutoff = (now - timedelta(days=self.spend_days)).strftime('%Y-%m-%d %H:%M:%S')
-        daily: dict[str, list[tuple[str, str, str | None]]] = {}
-        for at, kind, usd in rows:
-            if at >= cutoff:
-                daily.setdefault(at[:10], []).append((at, kind, usd))
-        days: list[SpendDay] = []
-        for day, day_rows in sorted(daily.items()):
-            days.append({'date': day, **totals(day_rows)})
-        return {'periods': periods, 'daily': days}
+        until = now.strftime('%Y-%m-%d %H:%M:%S')
+        daily: dict[str, _CostAccumulator] = {}
+        with closing(sqlite3.connect(self.journal)) as db:
+            for at, kind, usd in db.execute("SELECT at, cost_kind, usd FROM calls WHERE status != 'pending'"):
+                for _, start, total in periods:
+                    if at >= start:
+                        total.add(kind, usd)
+                if cutoff <= at <= until:
+                    daily.setdefault(at[:10], _CostAccumulator()).add(kind, usd)
+        return {
+            'periods': [SpendPeriod(name=name, **total.totals()) for name, _, total in periods],
+            'daily': [SpendDay(date=day, **total.totals()) for day, total in sorted(daily.items())],
+        }
 
     def supports_attachment(self, mime: str) -> bool:
         return (self.provider == 'openrouter' and self.model == 'google/gemini-embedding-2'

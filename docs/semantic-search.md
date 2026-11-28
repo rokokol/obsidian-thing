@@ -6,6 +6,28 @@ Set `enabled = false` in the vault's `embeddings` table. Keep `state_dir` to use
 
 Without `state_dir`, the server does not offer index tools. Set `indexing.auto = false` or omit it to avoid background scans. If you omit `enabled`, the `embeddings` table still enables vector search as before. If you omit the table, the vault has no search index
 
+## Metadata search
+
+Call `obsidian.find` to filter indexed Markdown notes by metadata or file name without embeddings. It returns vault-relative paths in path order. Each note must match all filters. The server checks access and the file revision before it applies `limit`
+
+```json
+{
+  "tags": ["project"],
+  "aliases": ["Obsidian Thing"],
+  "alias_property": "synonyms",
+  "properties": {"status": "active", "reviewed": null},
+  "limit": 10
+}
+```
+
+- `tags` matches YAML `tags` and tags in the note body. A tag matches its descendants: `project` matches `project/obsidian`, but not `projects`. The match ignores case and an optional leading `#`
+- `aliases` matches full values without regard to case, not prefixes. It searches the YAML `aliases` property by default. Use `alias_property` to select another top-level property. A scalar value or an item in a flat list can match
+- `properties` uses exact property names and case-sensitive scalar text. A string can match a scalar or one item in a flat list. Use `null` to check only for the presence of the property. The tool does not compare nested values or convert between YAML types
+
+- `filename_regex` searches the file name with its extension, not the directory path. It matches substrings by default. Use anchors for a full match and `(?i)` to ignore case. For example, `{"filename_regex": "(?i)^meeting-.*\\.md$"}` finds Markdown files whose names start with `meeting-`. An invalid pattern or a match that exceeds the time limit returns an error
+
+Supply at least one filter. After an upgrade, the next local scan adds metadata for unchanged notes. With automatic indexing off, call `obsidian.index` for each note to add it to metadata search
+
 ## Text fragments
 
 The index splits Markdown at top-level headings, including nested heading levels. It splits long sections at blank lines and splits oversized paragraphs by size. Headings inside code fences do not start sections
@@ -104,7 +126,7 @@ Each file appears once, with its best score and location. The `sections` list co
 
 The server reduces the file vectors with a principal component analysis. The mean vector of each file gives its point, so the position summarises a file rather than ranks it. `explained` gives the share of variance that each axis keeps. Coordinates fit a square from −1 to 1 and share one scale, so a drawn distance stays comparable to the distance it stands for. The same vectors always produce the same points, and the largest element of an axis fixes its sign, so a change of the linear algebra library cannot mirror a map. A file whose vectors cancel out sits at the origin
 
-The tool needs an embedding profile. A vault with only full-text search does not offer it
+The tool needs an embedding profile. A vault with only full-text search does not offer it. On the usual MCP endpoint, send `X-Obsidian-Thing-Client: plugin` with `tools/list` and `tools/call` to access the map. This header selects the client interface. It does not replace bearer authentication or change vault permissions
 
 ## Index status
 
@@ -118,15 +140,15 @@ The tool needs an embedding profile. A vault with only full-text search does not
 | `index.indexed` | Files with an entry in the local full-text index; a note edited since the last scan still counts until a scan catches it |
 | `index.unindexed` | Candidate files with no entry yet |
 | `index.embedded` | Files with vectors for the current profile and split; a file with no vectors does not count |
-| `index.pending` | Queued files that exist and pass the embedding scope check; the worker reads each one before it sends anything |
+| `index.pending` | Queue rows that match the current profile, file types and embedding scope. The worker checks the files before it sends data |
 | `index.last_full_scan` | UTC time of the last full scan that ran to the end, or null |
 | `embeddings.*` | Provider, model, dimensions, the first twelve characters of the profile, whether the route is remote, whether sending is allowed, the daily budget, the default threshold and the enabled MIME types |
 | `spend.periods` | `24h`, `7d`, `30d` and `all`, each with `calls`, `reported`, `estimated`, `unknown_calls` and `local_calls` |
 | `spend.daily` | The last 30 days that hold calls, with the same split for each day |
 
-The counts show what the last scan found, filtered by the files that exist now: a deleted note leaves every count at once, and the next scan prunes its row. A note edited since the last scan still counts as indexed until a scan catches it. A `.gitignore` the server cannot parse raises an error instead of making every file look excluded
+Coverage counts and `last_full_scan` come from one completed full scan. They remain `null` until the first such scan for the current profile and split. Later file changes do not change the coverage snapshot until the next full scan. The queue count reads the current database, but does not check the file system. The status call does not scan the vault
 
-The server adds reported and estimated prices separately and returns them as decimal strings. A call with no usable price lands in `unknown_calls` and never inside a sum. A local route records `local_calls` and no price. A reservation that a stopped process left behind counts as an estimate until the UTC day ends, the same way the daily budget counts it. The status call reads the journal and the two index tables; it does not call the provider and does not change the index
+The server adds reported and estimated prices separately and returns them as decimal strings. A call with no usable price lands in `unknown_calls` and never inside a sum. A local route records `local_calls` and no price. The spend report omits open reservations and includes completed calls that failed. Open reservations still count against the budget on the UTC day of the reservation. The status call does not contact the provider or change the index
 
 ## Index exclusions
 

@@ -17,7 +17,7 @@ def test_map_requires_plugin_opt_in_and_embeddings(tmp_path, monkeypatch, enable
     app = create_app({'vaults': {'notes': {
         'root': str(root), 'allowed': ['.'], 'token_env': 'TEST_PLUGIN_TOKEN',
         'embeddings': {'enabled': enabled, 'state_dir': str(state), 'provider': 'ollama',
-                       'model': 'synthetic', 'dimensions': 2},
+                       'model': 'synthetic', 'dimensions': 2, 'min_chunk_words': 0},
     }}})
     with TestClient(app, base_url='http://localhost') as client:
         unauthorized = client.post('/vaults/notes/mcp', headers={'X-Obsidian-Thing-Client': 'plugin'},

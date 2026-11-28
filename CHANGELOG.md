@@ -31,7 +31,7 @@
 - Limit write warnings, with `all_warnings` to read every one
 - Give custom write checkers optional access to selected vault properties and their link targets
 - Ship an example checker in `examples/`
-- Leave a heading without a body out of the index, and keep fragments shorter than `min_chunk_words` out of the vector index
+- Leave a heading without a body out of the index, and keep fragments shorter than `min_chunk_words` out of the vector index. The default is 24 words and `0` keeps every fragment
 - Index Markdown and plain text for semantic search with Ollama or opt-in OpenRouter
 - Record embedding calls and USD costs in a separate SQLite journal
 - Report index coverage, the embedding queue, the last full scan, the model profile and recorded costs with `obsidian.status`

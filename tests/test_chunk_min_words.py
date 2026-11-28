@@ -3,7 +3,7 @@ import pytest
 from obsidian_thing.embeddings import Embedder
 from obsidian_thing.search import SearchIndex
 from obsidian_thing.search_chunks import chunks
-from obsidian_thing.vault import Vault
+from obsidian_thing.vault import Vault, VaultError
 
 
 def test_a_heading_without_body_produces_no_chunk():
@@ -33,11 +33,11 @@ def test_min_chunk_words_keeps_short_bodies_in_text_search_only(tmp_path, monkey
     assert index.pending() == []
 
 
-def test_the_default_keeps_eight_word_bodies(tmp_path):
+def test_the_default_keeps_twenty_four_word_bodies(tmp_path):
     (tmp_path / 'vault').mkdir()
     index = SearchIndex(Vault(tmp_path / 'vault', ['.']), dict(provider='ollama', model='synthetic',
                         dimensions=2), tmp_path)
-    assert index.min_chunk_words == 8
+    assert index.min_chunk_words == 24
 
 
 def test_zero_restores_the_previous_behaviour(tmp_path, monkeypatch):
@@ -49,6 +49,20 @@ def test_zero_restores_the_previous_behaviour(tmp_path, monkeypatch):
     index = SearchIndex(Vault(root, ['.']), dict(provider='ollama', model='synthetic', dimensions=2,
                         min_chunk_words=0), tmp_path)
     assert index.index('short.md')['chunks'] == 1
+
+
+def test_related_names_the_limit_when_the_source_is_too_short(tmp_path, monkeypatch):
+    root = tmp_path / 'vault'
+    root.mkdir()
+    (root / 'short.md').write_text('# Тема\n\nдесять слов это ровно десять слов в этом абзаце вот\n')
+    monkeypatch.setattr(Embedder, 'embed', lambda self, text, operation: [1.0, 0.0])
+    index = SearchIndex(Vault(root, ['.']), dict(provider='ollama', model='synthetic', dimensions=2),
+                        tmp_path)
+    assert index.index('short.md')['chunks'] == 0
+    with pytest.raises(VaultError, match='at least 24 words'):
+        index.related('short.md', 10, -1)
+    with pytest.raises(VaultError, match='at least 24 words'):
+        index.map('short.md', 10, -1)
 
 
 @pytest.mark.parametrize('value', [-1, 1001, 1.5, '5', True])

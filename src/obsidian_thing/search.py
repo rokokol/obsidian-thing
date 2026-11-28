@@ -134,7 +134,7 @@ class SearchIndex:
         self.section_chunks = config.get('section_chunks', True)
         if not isinstance(self.section_chunks, bool):
             raise ValueError('Configure embedding section_chunks as a boolean')
-        words = config.get('min_chunk_words', 8)
+        words = config.get('min_chunk_words', 24)
         if type(words) is not int or not 0 <= words <= 1000:
             raise ValueError('Configure embedding min_chunk_words as an integer from 0 to 1000')
         self.min_chunk_words: int = words
@@ -523,6 +523,9 @@ class SearchIndex:
                   AND (? IS NULL OR (line_end >= ? AND line_start <= ?))
             ''', (self.embedder.profile, self.section_chunks, path, source['revision'],
                   *((None, None, None) if bounds is None else (bounds[0], *bounds))))]
+        if not vectors:
+            raise VaultError('The source has no fragments of at least '
+                             f'{self.min_chunk_words} words; lower min_chunk_words to index it')
         if not self._is_current(path, str(source['revision'])):
             raise VaultError('The source changed during related search; try again')
 

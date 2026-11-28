@@ -38,9 +38,9 @@ Set `section_chunks = false` in the vault's `embeddings` table to split by size 
 
 A heading with no body under it produces no fragment. A fragment of a heading alone carries no meaning, and two of them give the model the same input, so their similarity is exactly 1
 
-Set `min_chunk_words` to keep short fragments out of the vector index. The count is the words of the section body, not of the heading chain or the properties. A fragment below the limit stays in the text index, so `obsidian.query` still finds it, but `obsidian.related` and `obsidian.map` do not. The default is 8 and `0` indexes every fragment. Changing the value takes effect for a file on its next `obsidian.index` call or its next scheduled background run
+Set `min_chunk_words` to keep short fragments out of the vector index. The count is the words of the section body, not of the heading chain or the properties. A fragment below the limit stays in the text index, so `obsidian.query` still finds it, but `obsidian.related` and `obsidian.map` do not. The default is 24 and `0` indexes every fragment. A source note with no fragment at or above the limit cannot use `obsidian.related` or `obsidian.map`, and the error names the limit Changing the value takes effect for a file on its next `obsidian.index` call or its next scheduled background run
 
-`obsidian.query` and `obsidian.related` return one result per file. Text matches include the selected fragment's `headings`, `line_start`, and `line_end`. Line numbers are inclusive and start at one. The ranges refer to the source file, not the model input
+An empty `matches` list means that no file passed the threshold. `obsidian.query` and `obsidian.related` return one result per file. Text matches include the selected fragment's `headings`, `line_start`, and `line_end`. Line numbers are inclusive and start at one. The ranges refer to the source file, not the model input
 
 Run `obsidian.index` again for existing files after upgrade or after a mode change if that mode has no current index for the file. Search does not use entries from the previous format or the other mode. It can reuse cached vectors for unchanged model inputs
 

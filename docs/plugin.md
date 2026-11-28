@@ -20,7 +20,9 @@ The build puts the same install files in `plugin/dist/`
 
 ## Connect
 
-Open the Obsidian Thing settings. Enter the full vault endpoint, including `/vaults/<vault_id>/mcp`. Use HTTPS outside a trusted local network. The plugin does not follow redirects. Select or add the server token in Obsidian Secret Storage and test the connection. The plugin stores the secret ID, not the token, in its settings
+Open the Obsidian Thing settings. Enter the full vault endpoint, including `/vaults/<vault_id>/mcp`. Use HTTPS outside a trusted local network. The plugin does not follow redirects
+
+Paste the server token into **Store the vault token** and press Store. The plugin writes the value to Obsidian Secret Storage under `obsidian-thing-token` and keeps only that secret ID in its settings, so the token never reaches `data.json`. Press Test to list the tools the server offers for this vault
 
 Give each vault its own endpoint and secret. Files open from the local vault at the exact path the server returns. If the local copy does not contain that path, the plugin cannot open it
 

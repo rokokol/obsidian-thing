@@ -23,6 +23,8 @@ interface ThingSettings {
   secretId: string;
 }
 
+const DEFAULT_SECRET_ID = "obsidian-thing-token";
+
 const DEFAULT_SETTINGS: ThingSettings = {
   endpoint: "",
   secretId: "",
@@ -1912,7 +1914,7 @@ class ThingSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Bearer token secret")
       .setDesc(
-        "Select a secret that holds this vault's token. Create the secret in Obsidian's secret storage first.",
+        "Select the secret that holds this vault's token, or store a new one below.",
       )
       .addDropdown((dropdown) => {
         dropdown.selectEl.setAttr("data-thing", "secret");
@@ -1941,6 +1943,41 @@ class ThingSettingTab extends PluginSettingTab {
         text: "The selected secret no longer exists. Choose another secret.",
       });
     }
+
+    const stored = Boolean(this.thing.settings.secretId) &&
+      Boolean(this.app.secretStorage.getSecret(this.thing.settings.secretId));
+    const tokenInput = containerEl.createEl("input", {
+      attr: { type: "password", "data-thing": "token", placeholder: "Bearer token", autocomplete: "off" },
+      cls: "thing-token-input",
+    });
+    const storeToken = async (): Promise<void> => {
+      const token = tokenInput.value.trim();
+      if (!/^[a-zA-Z0-9._~+/=-]+$/.test(token)) {
+        new Notice("Use the token the server starts with; it has no spaces");
+        return;
+      }
+      const id = this.thing.settings.secretId || DEFAULT_SECRET_ID;
+      this.app.secretStorage.setSecret(id, token);
+      this.thing.settings.secretId = id;
+      tokenInput.value = "";
+      await this.saveConnection();
+      new Notice("Token stored in Obsidian's secret storage");
+      this.display();
+    };
+    new Setting(containerEl)
+      .setName("Store the vault token")
+      .setDesc(
+        "Paste the token once. It goes into Obsidian's secret storage under " +
+          `${this.thing.settings.secretId || DEFAULT_SECRET_ID}` +
+          " and never into data.json.",
+      )
+      .addButton((button) => {
+        button.buttonEl.setAttr("data-thing", "store-token");
+        button.setButtonText(stored ? "Replace" : "Store").onClick(() => void storeToken());
+      });
+    tokenInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") void storeToken();
+    });
 
     new Setting(containerEl)
       .setName("Test connection")

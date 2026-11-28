@@ -605,3 +605,8 @@
     padding: 3px 4px;
   }
 }
+
+.thing-token-input {
+  width: 100%;
+  margin: 0 0 8px;
+}

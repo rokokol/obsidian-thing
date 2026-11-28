@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js" data-ddlc-heading="plain">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-ru="Возможности — Obsidian Thing">Features — Obsidian Thing</title>
+<meta name="description" content="Reading with revisions, writing that passes your rules, full-text and vector search, Canvas and Base edits, vault skills and memory, and one Obsidian plugin" data-ru-content="Чтение с ревизиями, запись через твои правила, полнотекстовый и векторный поиск, правки Canvas и Base, скиллы и память волта, один плагин Obsidian">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Features — Obsidian Thing">
+<meta property="og:description" content="Every capability of the server, grouped, with the switch that turns it on">
+<meta property="og:image" content="https://obsidian-thing.rokokol.art/assets/cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Obsidian Thing: a vault on one endpoint, a token, and a call that returns a revision">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://obsidian-thing.rokokol.art/assets/cover.png">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222222" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="./assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./assets/vendor/ddlc/ddlc-tokens.css">
+<link rel="stylesheet" href="./assets/vendor/ddlc/ddlc-ui.css">
+<link rel="stylesheet" href="./assets/vendor/ddlc/ddlc-report.css">
+<link rel="stylesheet" href="./assets/site.css">
+<script>
+  (function () {
+    try {
+      var q = new URLSearchParams(location.search)
+      var pinned = q.get("theme")
+      var theme = pinned === "light" || pinned === "dark" ? pinned : localStorage.getItem("obsidian-thing-theme")
+      if (pinned === "light" || pinned === "dark") localStorage.setItem("obsidian-thing-theme", pinned)
+      if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme
+      var lang = q.get("lang")
+      var stored = localStorage.getItem("obsidian-thing-lang")
+      if (lang === "ru" || (lang !== "en" && stored === "ru")) document.documentElement.lang = "ru"
+    } catch (e) {}
+  })()
+</script>
+<script type="module" src="./assets/kit.js"></script>
+<script src="./assets/site.js" defer></script>
+</head>
+<body>
+<canvas class="cloud" id="cloud" aria-hidden="true"></canvas>
+<a class="skip" href="#main" data-ru="К содержанию">Skip to content</a>
+<header class="site-bar">
+  <div class="bar wrap bar-row">
+    <a class="brand" href="./index.html" aria-label="Obsidian Thing home" data-ru-aria-label="Obsidian Thing — главная">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>Obsidian Thing</span>
+    </a>
+    <p class="tagline" data-ru="Волт за эндпоинтом MCP">A vault behind an MCP endpoint</p>
+    <nav class="tabs" aria-label="Main" data-ru-aria-label="Основное">
+      <a href="./index.html" data-ru="Обзор">Overview</a>
+      <a href="./features.html" aria-current="page" data-ru="Возможности">Features</a>
+      <a href="./tools.html" data-ru="Инструменты">Tools</a>
+      <a href="./docs/index.html" data-ru="Документация">Docs</a>
+      <a href="./faq.html" data-ru="Вопросы">FAQ</a>
+    </nav>
+    <div class="bar-end">
+      <code class="bar-endpoint" aria-hidden="true">/vaults/notes/mcp</code>
+      <div class="segmented lang-switch" role="group" aria-label="Language" data-ru-aria-label="Язык">
+        <button type="button" data-lang-set="en" aria-pressed="true">EN</button>
+        <button type="button" data-lang-set="ru" aria-pressed="false">RU</button>
+      </div>
+      <button class="icon-button" id="theme" type="button" aria-label="Theme: system" data-ru-aria-label="Тема">
+        <svg class="pixel" viewBox="0 0 8 8" aria-hidden="true"><path id="theme-icon"/></svg>
+      </button>
+      <a class="icon-button" href="https://github.com/rokokol/obsidian-thing" aria-label="Obsidian Thing on GitHub" data-ru-aria-label="Obsidian Thing на GitHub">
+        <span class="icon-github" aria-hidden="true"></span>
+      </a>
+    </div>
+  </div>
+</header>
+<main id="main">
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker" data-ru="Возможности">Features</span>
+        <h1 data-ru="Что сервер умеет, и чем это ограничено">What the server does, and where it stops</h1>
+        <p data-ru="Каждая возможность включается отдельно и действует на один волт. То, что выключено, не появляется в списке инструментов и не тратит ресурсов">Each capability is switched on separately and applies to one vault. What is off never appears in the tool list and costs nothing</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="reading">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker" data-ru="Чтение">Reading</span>
+        <h2 data-ru="Текст, ревизия и граф связей">Text, revision and the graph of links</h2>
+      </div>
+      <div class="grid grid-3">
+        <div class="card">
+          <h3 data-ru="Файл с ревизией">A file with its revision</h3>
+          <p data-ru="obsidian.read отдаёт путь, содержимое и SHA-256 байтов. obsidian.stat отдаёт размер и ревизию, не передавая мегабайты текста"><code>obsidian.read</code> returns the path, the content and the SHA-256 of the bytes. <code>obsidian.stat</code> returns the size and the revision without moving text</p>
+        </div>
+        <div class="card">
+          <h3 data-ru="Ссылки в обе стороны">Links, both ways</h3>
+          <p data-ru="obsidian.links_out перечисляет ссылки заметки, Canvas или Base с разрешением каждой, obsidian.links_in — что указывает на файл"><code>obsidian.links_out</code> lists the links of a note, Canvas or Base with each resolution, and <code>obsidian.links_in</code> lists what points at a file</p>
+        </div>
+        <div class="card">
+          <h3 data-ru="Вложения без байтов">Attachments without bytes</h3>
+          <p data-ru="obsidian.media называет вложения, их тип и размер и не возвращает сами файлы"><code>obsidian.media</code> names the attachments, their type and their size, and returns no file bytes</p>
+        </div>
+      </div>
+      <div class="table-wrap spaced">
+        <table>
+          <caption data-ru="Как разрешается ссылка">How a link resolves</caption>
+          <thead>
+            <tr>
+              <th scope="col" data-ru="Статус">Status</th>
+              <th scope="col" data-ru="Что значит">Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row"><code>resolved</code></th><td data-ru="Ровно один файл, и якорь в нём есть">One file, and its anchor exists</td></tr>
+            <tr><th scope="row"><code>ambiguous</code></th><td data-ru="Подходят несколько файлов. Сервер возвращает кандидатов и никому не отдаёт бэклинк">More than one file matches. The server returns the candidates and gives none of them the backlink</td></tr>
+            <tr><th scope="row"><code>unresolved</code></th><th scope="row" data-ru="Ни одного видимого файла">No visible file matches</th></tr>
+            <tr><th scope="row"><code>external</code></th><td data-ru="Ссылка ведёт за пределы волта. Сервер её не открывает">The link points outside the vault. The server does not fetch it</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="writing">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker" data-ru="Запись">Writing</span>
+        <h2 data-ru="Замена по ревизии, правка фрагмента, переименование">Replace at a revision, edit a fragment, rename</h2>
+        <p data-ru="Запись выключена по умолчанию. Во включаемом волте она сериализуется в один процесс и не обещает защиты от несохранённого буфера в Obsidian">Writing is off by default. In a writable vault it is serialized in one process, and it does not protect against an unsaved buffer in Obsidian</p>
+      </div>
+      <div class="grid grid-3">
+        <div class="card">
+          <span class="sticker" data-ru="создать и заменить">create and replace</span>
+          <h3 data-ru="Одна атомарная запись">One atomic write</h3>
+          <p data-ru="Новый файл создаётся без expected_revision. Замена обязана назвать ревизию, иначе сервер откажет: «прочитай перед заменой»">A new file is created without <code>expected_revision</code>. A replacement must name the revision, or the server refuses with a read-first error</p>
+        </div>
+        <div class="card">
+          <span class="sticker alt" data-ru="фрагмент">fragment</span>
+          <h3 data-ru="Одно точное совпадение">One exact match</h3>
+          <p data-ru="obsidian.update заменяет old на new там, где old встречается ровно один раз. Два совпадения, в том числе перекрывающиеся, отказывают"><code>obsidian.update</code> replaces <code>old</code> with <code>new</code> where <code>old</code> occurs exactly once. Two matches, overlapping ones included, refuse the edit</p>
+        </div>
+        <div class="card">
+          <span class="sticker quiet" data-ru="переименование">rename</span>
+          <h3 data-ru="Ссылки правятся вместе с именем">Links change with the name</h3>
+          <p data-ru="Файл остаётся в своём каталоге и со своим расширением. Видимые ссылки на него правятся в том же переходе, а небезопасная правка отменяет переименование целиком">The file stays in its directory with its extension. Visible links change in the same step, and one unsafe edit cancels the whole rename</p>
+        </div>
+      </div>
+      <p class="footnote" data-ru="Удаление требует настроенной корзины и отказывает, если заметка потеряет цель ссылки. См. &lt;a href=&quot;./docs/safety.html&quot;&gt;права и правила&lt;/a&gt;">Deletion needs a configured trash, and it refuses when a note would lose a link target. See <a href="./docs/safety.html">permissions</a></p>
+    </div>
+  </section>
+
+  <section class="section" id="rules">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker" data-ru="Правила">Rules</span>
+        <h2 data-ru="Написанное правило проверяется до записи">A written rule is checked before the write</h2>
+        <p data-ru="Каждая проверка сравнивает текущий файл с предложенным текстом. То, что уже было в файле, становится предупреждением, а новое нарушение — ошибкой, которая блокирует запись">Each check compares the current file with the proposed text. What the file already had becomes a warning, and a new finding becomes an error that blocks the write</p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <caption data-ru="Переключатели проверок волта">The per-vault checks</caption>
+          <thead>
+            <tr>
+              <th scope="col" data-ru="Ключ">Key</th>
+              <th scope="col" data-ru="Что проверяет">What it checks</th>
+              <th scope="col" data-ru="Уровень">Level</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row"><code>default_quotes</code></th><td data-ru="Кавычки нового текста, например &lt;code&gt;&quot;&quot;&lt;/code&gt;">The quotes of new text, for example <code>""</code></td><td data-ru="ошибка">error</td></tr>
+            <tr><th scope="row"><code>trailing_periods</code></th><td data-ru="Точка в конце абзаца или пункта списка">A full stop at the end of a paragraph or a list item</td><td data-ru="ошибка">error</td></tr>
+            <tr><th scope="row"><code>broken_links</code></th><td data-ru="Новая ссылка, у которой нет цели">A new link with no target</td><td data-ru="ошибка">error</td></tr>
+            <tr><th scope="row"><code>callouts</code></th><td data-ru="Неизвестный маркер callout">An unknown callout marker</td><td data-ru="ошибка">error</td></tr>
+            <tr><th scope="row"><code>paragraph_lines</code></th><td data-ru="Абзац, разбитый на строки переносом">A paragraph broken into lines by hand</td><td data-ru="предупреждение">warning</td></tr>
+            <tr><th scope="row"><code>prevent_inline_tags</code></th><td data-ru="Новый inline-тег в Markdown">A new inline tag in Markdown</td><td data-ru="ошибка">error</td></tr>
+            <tr><th scope="row"><code>bases</code>, <code>canvas</code></th><td data-ru="Структура Base и Canvas">The structure of a Base and a Canvas</td><td data-ru="ошибка">error</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="grid grid-2 spaced">
+        <div class="card">
+          <h3 data-ru="Свой чекер на Python">Your own checker in Python</h3>
+          <p data-ru="Сервер запускает доверенный скрипт до записи и передаёт ему предложенный текст, ссылки и выбранные свойства. Ответ может разрешить запись, добавить предупреждение или отказать с причиной">The server runs a trusted script before the write and passes the proposed text, its links and the properties you select. The answer allows the write, adds a warning, or refuses with a reason</p>
+        </div>
+        <div class="card">
+          <h3 data-ru="Отказ вместо порчи файла">A refusal instead of a damaged file</h3>
+          <p data-ru="Тайм-аут, ненулевой код возврата, мусор в ответе или вывод больше 16 КиБ блокируют запись. Чекер не может вернуть замену текста и не участвует в удалении">A timeout, a non-zero exit, a malformed answer or more than 16 KiB of output blocks the write. The checker cannot return replacement text, and it does not take part in a deletion</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="search">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker" data-ru="Поиск">Search</span>
+        <h2 data-ru="Текст без модели, смысл по разрешению">Text without a model, meaning on request</h2>
+        <p data-ru="Индекс живёт в приватном каталоге состояния отдельно от волта, а журнал расходов — в отдельной базе внутри него">The index lives in a private state directory outside the vault, and the cost journal lives in a database of its own inside it</p>
+      </div>
+      <div class="grid grid-3">
+        <div class="card">
+          <span class="sticker" data-ru="текст">text</span>
+          <h3 data-ru="Ранжирование без провайдера">Ranking with no provider</h3>
+          <p data-ru="obsidian.query ищет по словам через FTS5 и не требует модели. Подчёркивания остаются внутри слова, поэтому section_chunks находится"><code>obsidian.query</code> searches words through FTS5 and needs no model. Underscores stay inside a word, so <code>section_chunks</code> is found</p>
+        </div>
+        <div class="card">
+          <span class="sticker alt" data-ru="метаданные">metadata</span>
+          <h3 data-ru="Фильтры по свойствам">Filters on properties</h3>
+          <p data-ru="obsidian.find фильтрует по тегу, алиасу, свойству и регулярному выражению имени файла, без эмбеддингов. Тег совпадает и по потомкам"><code>obsidian.find</code> filters by tag, alias, property and a regular expression on the file name, with no embeddings. A tag matches its descendants</p>
+        </div>
+        <div class="card">
+          <span class="sticker quiet" data-ru="векторы">vectors</span>
+          <h3 data-ru="Соседи и карта">Neighbours and a map</h3>
+          <p data-ru="obsidian.related находит ближайшие заметки к файлу или его секции, obsidian.map рисует ту же окрестность на двух осях. Ранг считают векторы, а не координаты"><code>obsidian.related</code> finds the nearest notes to a file or one of its sections, and <code>obsidian.map</code> draws the same neighbourhood on two axes. The vectors rank, the coordinates do not</p>
+        </div>
+      </div>
+      <p class="footnote" data-ru="Провайдеры, вложения, бюджет и журнал: &lt;a href=&quot;./docs/search.html&quot;&gt;поиск и расходы&lt;/a&gt;">Providers, attachments, the budget and the journal: <a href="./docs/search.html">search and cost</a></p>
+    </div>
+  </section>
+
+  <section class="section" id="integrations">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker" data-ru="Интеграции">Integrations</span>
+        <h2 data-ru="То, что Obsidian хранит в своих форматах">What Obsidian keeps in its own formats</h2>
+        <p data-ru="Почти всё выключено по умолчанию. Включённая интеграция добавляет инструменты, отключённая не сканирует и не переписывает свои ссылки">Almost everything is off by default. A switch on adds its tools, and a switch off neither scans nor rewrites its references</p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <caption data-ru="Переключатели интеграций волта">The per-vault integration switches</caption>
+          <thead>
+            <tr>
+              <th scope="col" data-ru="Переключатель">Switch</th>
+              <th scope="col" data-ru="По умолчанию">Default</th>
+              <th scope="col" data-ru="Что даёт">What it adds</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><th scope="row"><code>canvas</code></th><td data-ru="включён">on</td><td data-ru="Сканирование Canvas, проверки записи и пакетные правки узлов и рёбер">Canvas scans, write checks and batched node and edge edits</td></tr>
+            <tr><th scope="row"><code>bases</code></th><td data-ru="включён">on</td><td data-ru="Якоря представлений, проверки и правки фильтров, формул и представлений">View anchors, checks and edits of filters, formulas and views</td></tr>
+            <tr><th scope="row"><code>media_gallery</code></th><td data-ru="выключен">off</td><td data-ru="Блоки Media Gallery в графе ссылок">Media Gallery blocks in the link graph</td></tr>
+            <tr><th scope="row"><code>iconic_offline</code></th><td data-ru="выключен">off</td><td data-ru="Иконка и цвет файла в настройках Iconic, без приложения">A file's icon and colour in the Iconic settings, without the app</td></tr>
+            <tr><th scope="row"><code>fsrs_dictionary</code></th><td data-ru="выключен">off</td><td data-ru="Карточки FSRS Vocabulary, их состояние и история повторений">FSRS Vocabulary cards, their state and their review history</td></tr>
+            <tr><th scope="row"><code>excalidraw</code></th><td data-ru="выключен">off</td><td data-ru="PNG-рендер сохранённого рисунка без браузера">A PNG of a saved drawing, without a browser</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="skills">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker" data-ru="Скиллы, память и инструкции">Skills, memory, instructions</span>
+        <h2 data-ru="Волт приносит агенту свои правила">The vault brings the agent its own rules</h2>
+      </div>
+      <div class="grid grid-3">
+        <div class="card">
+          <span class="num-sticker">01</span>
+          <h3 data-ru="Инструкции по имени">Instructions by name</h3>
+          <p data-ru="obsidian.agentsmd возвращает первый читаемый файл списка instructions, по умолчанию AGENTS.md, GEMINI.md, CLAUDE.md. Файл вне allowlist пропускается и не скрывает следующий"><code>obsidian.agentsmd</code> returns the first readable file of <code>instructions</code>, by default <code>AGENTS.md</code>, <code>GEMINI.md</code>, <code>CLAUDE.md</code>. A file outside the allowlist is skipped and never hides the next one</p>
+        </div>
+        <div class="card">
+          <span class="num-sticker">02</span>
+          <h3 data-ru="Скиллы рядом с чужими">Skills beside the agent's own</h3>
+          <p data-ru="obsidian.skills_list читает .agents/skills, obsidian.skill_read открывает SKILL.md и справочные файлы внутри каталога скилла. Скиллы среды и скиллы волта не мешают друг другу"><code>obsidian.skills_list</code> reads <code>.agents/skills</code>, and <code>obsidian.skill_read</code> opens <code>SKILL.md</code> and the reference files inside the skill directory. The harness skills and the vault skills never collide</p>
+        </div>
+        <div class="card">
+          <span class="num-sticker">03</span>
+          <h3 data-ru="Память, пережившая сессию">Memory that outlives the session</h3>
+          <p data-ru="Заметка в .agents/memory с описанием во frontmatter попадает в MEMORY.md одной строкой. Писать может только волт с включённой записью">A note in <code>.agents/memory</code> with a description in its frontmatter takes one line in <code>MEMORY.md</code>. Only a writable vault can write one</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="plugin">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker" data-ru="Плагин">The plugin</span>
+        <h2 data-ru="Ответ сервера внутри Obsidian">The server's answer, inside Obsidian</h2>
+        <p data-ru="Плагин не держит свой индекс и не редактирует заметки: он показывает то, что посчитал сервер, и прячет всё, чего сервер не предлагает">The plugin keeps no index of its own and edits no notes: it shows what the server computed and hides what the server does not offer</p>
+      </div>
+      <div class="grid grid-3">
+        <div class="card">
+          <h3 data-ru="Боковая панель">The sidebar</h3>
+          <p data-ru="Поиск с фильтрами и вкладка соседей открытой заметки, с переходом к файлу по результату">Search with filters, and a tab of the open note's neighbours, with the file opening from a result</p>
+        </div>
+        <div class="card">
+          <h3 data-ru="Карта">The map</h3>
+          <p data-ru="Отдельное представление с той же окрестностью на двух осях. Выбор точки открывает заметку">A separate view with the same neighbourhood on two axes. A point opens its note</p>
+        </div>
+        <div class="card">
+          <h3 data-ru="Статус">The status</h3>
+          <p data-ru="Покрытие индекса, очередь, профиль модели и расходы по дням, с разделением подтверждённой цены и оценки">Index coverage, the queue, the model profile and the cost by day, with a confirmed price kept apart from an estimate</p>
+        </div>
+      </div>
+      <p class="footnote" data-ru="Токен хранится в Secret Storage Obsidian, а не в data.json. См. &lt;a href=&quot;./docs/connect.html#plugin&quot;&gt;как подключить&lt;/a&gt;">The token lives in Obsidian's secret storage, not in <code>data.json</code>. See <a href="./docs/connect.html#plugin">how to connect it</a></p>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-inner">
+      <div>
+        <a class="brand" href="./index.html" aria-label="Obsidian Thing home" data-ru-aria-label="Obsidian Thing — главная">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span>Obsidian Thing</span>
+        </a>
+        <p class="footer-note" data-ru="Волт Obsidian за эндпоинтом MCP: чтение, запись, поиск и связи">An Obsidian vault behind an MCP endpoint: reading, writing, search and links</p>
+      </div>
+      <div>
+        <p class="footer-title" data-ru="Проект">Project</p>
+        <ul>
+          <li><a href="https://github.com/rokokol/obsidian-thing" data-ru="Исходники">Source</a></li>
+          <li><a href="https://github.com/rokokol/obsidian-thing/releases" data-ru="Релизы">Releases</a></li>
+          <li><a href="https://github.com/rokokol/obsidian-thing/pkgs/container/obsidian-thing" data-ru="Образ">Container</a></li>
+          <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/LICENSE" data-ru="Лицензия MIT">MIT licence</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-title" data-ru="Документация">Docs</p>
+        <ul>
+          <li><a href="./tools.html" data-ru="Инструменты">Tools</a></li>
+          <li><a href="./docs/connect.html" data-ru="Подключение">Connecting</a></li>
+          <li><a href="./docs/safety.html" data-ru="Права и правила">Permissions</a></li>
+          <li><a href="./docs/search.html" data-ru="Поиск">Search</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-title" data-ru="Сайт">Site</p>
+        <ul>
+          <li><a href="./index.html" data-ru="Обзор">Overview</a></li>
+          <li><a href="./features.html" data-ru="Возможности">Features</a></li>
+          <li><a href="./faq.html" data-ru="Вопросы">FAQ</a></li>
+          <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/CHANGELOG.md" data-ru="Изменения">Changelog</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-credit">
+      <p data-ru="Цвета и кит — из &lt;a href=&quot;https://github.com/rokokol/ddlc-themes&quot;&gt;ddlc-themes&lt;/a&gt;, сняты с ddlc.moe через &lt;a href=&quot;https://github.com/rokokol/ddlc-palette&quot;&gt;ddlc-palette&lt;/a&gt;. Шрифты Departure Mono и Mya Nunito — SIL OFL 1.1">Colours and kit from <a href="https://github.com/rokokol/ddlc-themes">ddlc-themes</a>, measured off ddlc.moe through <a href="https://github.com/rokokol/ddlc-palette">ddlc-palette</a>. The faces Departure Mono and Mya Nunito are SIL OFL 1.1</p>
+      <p data-ru="Obsidian — товарный знак Dynalist Inc. Проект с ним не связан. Doki Doki Literature Club — Team Salvato; проект не связан и не одобрен">Obsidian is a trademark of Dynalist Inc. This project is not affiliated with it. Doki Doki Literature Club belongs to Team Salvato, and this project is neither affiliated with nor endorsed by it</p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

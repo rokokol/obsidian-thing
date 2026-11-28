@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en" data-ddlc-heading="plain" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="robots" content="noindex">
+<title>Obsidian Thing — cover card</title>
+<link rel="stylesheet" href="./vendor/ddlc/ddlc-tokens.css">
+<link rel="stylesheet" href="./vendor/ddlc/ddlc-ui.css">
+<style>
+  /* The 1200 × 630 card that og:image points at. It is rendered once from this page, not
+     drawn by hand: chromium --headless --window-size=1200,630 --screenshot */
+  html,
+  body {
+    width: 1200px;
+    height: 630px;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: var(--ddlc-ink);
+    color: var(--ddlc-paper);
+    font: 11px / 2 var(--ddlc-font-data);
+  }
+
+  /* The class names avoid the kit's .card and .panel: both carry a grid area there */
+  .cover {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 380px;
+    gap: 40px;
+    box-sizing: border-box;
+    width: 1200px;
+    height: 630px;
+    padding: 56px 56px 48px;
+    background: var(--ddlc-ink);
+  }
+
+  .lattice {
+    position: absolute;
+    inset: 0;
+    width: 1200px;
+    height: 630px;
+    image-rendering: pixelated;
+    mask-image: radial-gradient(86% 96% at 100% -8%, black 0%, black 26%, transparent 58%);
+    -webkit-mask-image: radial-gradient(86% 96% at 100% -8%, black 0%, black 26%, transparent 58%);
+  }
+
+  .cover-left {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding-bottom: 52px;
+  }
+
+  .brand-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 26px;
+  }
+
+  /* The mark is a mask on the card too: the card is always dark, so the shape takes the
+     card's own light role and no second copy of the drawing exists */
+  .brand-mark {
+    width: 32px;
+    height: 32px;
+    flex: none;
+    background-color: var(--ddlc-blush);
+    -webkit-mask: url("./logo.svg") center / contain no-repeat;
+    mask: url("./logo.svg") center / contain no-repeat;
+  }
+
+  .brand-row span {
+    font-size: 22px;
+    color: var(--ddlc-paper);
+  }
+
+  .kicker {
+    margin: 0 0 18px;
+    color: var(--ddlc-pink);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+  }
+
+  h1 {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font-family: var(--ddlc-font-data);
+    font-size: 62px;
+    font-weight: 400;
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    text-shadow: 3px 3px 0 var(--ddlc-plum);
+  }
+
+  h1 em {
+    font-style: normal;
+    color: var(--ddlc-blush);
+  }
+
+  .lead {
+    max-width: 44ch;
+    margin: 22px 0 0;
+    color: color-mix(in srgb, var(--ddlc-paper) 78%, var(--ddlc-ink));
+    font: 500 19px / 1.5 var(--ddlc-font-prose);
+  }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: auto 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .chips li {
+    padding: 2px 10px;
+    border: 2px solid var(--ddlc-yuri);
+    background: var(--ddlc-ink);
+    color: var(--ddlc-paper);
+    box-shadow: 3px 3px 0 var(--ddlc-plum);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .cover-panel {
+    position: relative;
+    z-index: 1;
+    align-self: center;
+    display: grid;
+    gap: 10px;
+    padding: 14px 18px 18px;
+    border: 2px solid var(--ddlc-paper);
+    background: color-mix(in srgb, var(--ddlc-ink) 88%, var(--ddlc-paper));
+    box-shadow: 8px 8px 0 var(--ddlc-blush);
+  }
+
+  .cover-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    color: color-mix(in srgb, var(--ddlc-paper) 70%, var(--ddlc-ink));
+  }
+
+  .dot {
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    margin-right: 8px;
+    background: var(--ddlc-monika-eye);
+    vertical-align: -1px;
+  }
+
+  .path {
+    margin: 0;
+    padding: 6px 10px;
+    border: 2px solid var(--ddlc-yuri);
+    background: var(--ddlc-yuri-shadow);
+    color: var(--ddlc-paper);
+    font-size: 22px;
+  }
+
+  .path b {
+    color: var(--ddlc-pink);
+    font-weight: 400;
+  }
+
+  .token {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    color: color-mix(in srgb, var(--ddlc-paper) 62%, var(--ddlc-ink));
+  }
+
+  .token code {
+    color: var(--ddlc-paper);
+  }
+
+  .calls {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 8px 10px;
+    border: 2px solid var(--ddlc-yuri);
+    background: var(--ddlc-yuri-shadow);
+    list-style: none;
+    line-height: 1.9;
+  }
+
+  .calls .call {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .calls .name {
+    color: var(--ddlc-blush);
+  }
+
+  .calls .ms {
+    color: color-mix(in srgb, var(--ddlc-paper) 60%, var(--ddlc-ink));
+  }
+
+  .calls .hit {
+    color: var(--ddlc-paper);
+  }
+
+  .calls .hit::before {
+    content: "▸ ";
+    color: var(--ddlc-pink);
+  }
+
+  .calls .score {
+    float: right;
+    color: var(--ddlc-pink);
+  }
+
+  .meter {
+    height: 12px;
+    border: 2px solid var(--ddlc-yuri);
+    background: var(--ddlc-ink);
+  }
+
+  .meter span {
+    display: block;
+    width: 92%;
+    height: 100%;
+    background: repeating-linear-gradient(90deg, var(--ddlc-pink) 0 6px, transparent 6px 8px);
+  }
+
+  .cover-foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    color: color-mix(in srgb, var(--ddlc-paper) 62%, var(--ddlc-ink));
+  }
+
+  .cover-footer {
+    position: absolute;
+    left: 56px;
+    right: 56px;
+    bottom: 28px;
+    z-index: 1;
+    display: flex;
+    justify-content: space-between;
+    gap: 24px;
+    padding-top: 14px;
+    border-top: 2px solid var(--ddlc-yuri);
+    color: color-mix(in srgb, var(--ddlc-paper) 62%, var(--ddlc-ink));
+  }
+</style>
+</head>
+<body>
+<div class="cover">
+  <canvas class="lattice" id="lattice" width="600" height="315"></canvas>
+  <div class="cover-left">
+    <div class="brand-row">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>Obsidian Thing</span>
+    </div>
+    <p class="kicker">MCP Streamable HTTP · one token per vault · MIT</p>
+    <h1>Your vault.<br>One endpoint.<br><em>Your rules.</em></h1>
+    <p class="lead">Reads without the app, writes at a revision, search that stays on your machine</p>
+    <ul class="chips">
+      <li>Python 3.11+</li>
+      <li>Nix · Docker · uv</li>
+      <li>Writable by choice</li>
+    </ul>
+  </div>
+  <div class="cover-panel">
+    <div class="cover-head"><span><span class="dot"></span>vault: notes</span><span>127.0.0.1:8765</span></div>
+    <p class="path">/vaults/<b>notes</b>/mcp</p>
+    <div class="token"><span>Authorization: Bearer</span><code>•••• 7f1c</code></div>
+    <ul class="calls">
+      <li class="call"><span class="name">obsidian.query</span><span class="ms">14 ms</span></li>
+      <li class="hit">Notes/Search.md § Reindexing<span class="score">0.78</span></li>
+      <li class="hit">Notes/State dir.md § Coverage<span class="score">0.64</span></li>
+      <li class="call"><span class="name">obsidian.read</span><span class="ms">2 ms</span></li>
+      <li class="hit">Notes/Search.md<span class="score">rv 0fdc</span></li>
+    </ul>
+    <div class="meter"><span></span></div>
+    <div class="cover-foot"><span>index coverage</span><span>4 312 notes · 0 bytes sent</span></div>
+  </div>
+  <div class="cover-footer">
+    <span>github.com/rokokol/obsidian-thing</span>
+    <span>obsidian-thing.rokokol.art</span>
+  </div>
+</div>
+<script>
+  // The static frame the site's hero draws in motion: three drifting sources and one band,
+  // dithered on an 8 × 8 bayer lattice. Fixed values, so the card renders the same way twice
+  const canvas = document.getElementById("lattice")
+  const ctx = canvas.getContext("2d")
+  const PITCH = 5
+  const BAYER = [
+    [0, 32, 8, 40, 2, 34, 10, 42], [48, 16, 56, 24, 50, 18, 58, 26],
+    [12, 44, 4, 36, 14, 46, 6, 38], [60, 28, 52, 20, 62, 30, 54, 22],
+    [3, 35, 11, 43, 1, 33, 9, 41], [51, 19, 59, 27, 49, 17, 57, 25],
+    [15, 47, 7, 39, 13, 45, 5, 37], [63, 31, 55, 23, 61, 29, 53, 21],
+  ].map((row) => row.map((value) => value / 64))
+
+  const style = getComputedStyle(document.documentElement)
+  const role = (name) => style.getPropertyValue(name).trim()
+  const fills = [role("--ddlc-pink"), role("--ddlc-blush"), role("--ddlc-plum")]
+
+  const w = canvas.width
+  const h = canvas.height
+  const sources = [
+    { x: 0.62 * w, y: 0.28 * h, radius: 0.20 * Math.min(w, h) },
+    { x: 0.84 * w, y: 0.58 * h, radius: 0.17 * Math.min(w, h) },
+    { x: 0.96 * w, y: 0.20 * h, radius: 0.22 * Math.min(w, h) },
+  ]
+
+  for (let column = Math.floor((0.44 * w) / PITCH); column * PITCH < w; column++) {
+    for (let row = 0; row * PITCH < h; row++) {
+      const x = column * PITCH
+      const y = row * PITCH
+      let value = 0
+      for (const source of sources) {
+        const dx = x - source.x
+        const dy = y - source.y
+        value += 0.5 * Math.exp(-(dx * dx + dy * dy) / (2 * source.radius * source.radius))
+      }
+      value += 0.22 * Math.exp(-Math.pow((x / w - 0.55) * 3.4, 2))
+      if (value * 1.5 > BAYER[row & 7][column & 7]) {
+        ctx.fillStyle = value > 0.62 ? fills[1] : value > 0.34 ? fills[0] : fills[2]
+        ctx.fillRect(x, y, PITCH - 2, PITCH - 2)
+      }
+    }
+  }
+</script>
+</body>
+</html>

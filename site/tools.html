@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js" data-ddlc-heading="plain">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-ru="Инструменты — Obsidian Thing">Tools — Obsidian Thing</title>
+<meta name="description" content="Every MCP tool of Obsidian Thing with its arguments, what it returns, and the vault switch that offers it" data-ru-content="Каждый инструмент MCP в Obsidian Thing: аргументы, ответ и переключатель волта, который его включает">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Tools — Obsidian Thing">
+<meta property="og:description" content="Every MCP tool with its arguments and the switch that offers it">
+<meta property="og:image" content="https://obsidian-thing.rokokol.art/assets/cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Obsidian Thing: a vault on one endpoint, a token, and a call that returns a revision">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://obsidian-thing.rokokol.art/assets/cover.png">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222222" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="./assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./assets/vendor/ddlc/ddlc-tokens.css">
+<link rel="stylesheet" href="./assets/vendor/ddlc/ddlc-ui.css">
+<link rel="stylesheet" href="./assets/vendor/ddlc/ddlc-report.css">
+<link rel="stylesheet" href="./assets/site.css">
+<script>
+  (function () {
+    try {
+      var q = new URLSearchParams(location.search)
+      var pinned = q.get("theme")
+      var theme = pinned === "light" || pinned === "dark" ? pinned : localStorage.getItem("obsidian-thing-theme")
+      if (pinned === "light" || pinned === "dark") localStorage.setItem("obsidian-thing-theme", pinned)
+      if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme
+      var lang = q.get("lang")
+      var stored = localStorage.getItem("obsidian-thing-lang")
+      if (lang === "ru" || (lang !== "en" && stored === "ru")) document.documentElement.lang = "ru"
+    } catch (e) {}
+  })()
+</script>
+<script type="module" src="./assets/kit.js"></script>
+<script src="./assets/site.js" defer></script>
+</head>
+<body>
+<canvas class="cloud" id="cloud" aria-hidden="true"></canvas>
+<a class="skip" href="#main" data-ru="К содержанию">Skip to content</a>
+<header class="site-bar">
+  <div class="bar wrap bar-row">
+    <a class="brand" href="./index.html" aria-label="Obsidian Thing home" data-ru-aria-label="Obsidian Thing — главная">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>Obsidian Thing</span>
+    </a>
+    <p class="tagline" data-ru="Волт за эндпоинтом MCP">A vault behind an MCP endpoint</p>
+    <nav class="tabs" aria-label="Main" data-ru-aria-label="Основное">
+      <a href="./index.html" data-ru="Обзор">Overview</a>
+      <a href="./features.html" data-ru="Возможности">Features</a>
+      <a href="./tools.html" aria-current="page" data-ru="Инструменты">Tools</a>
+      <a href="./docs/index.html" data-ru="Документация">Docs</a>
+      <a href="./faq.html" data-ru="Вопросы">FAQ</a>
+    </nav>
+    <div class="bar-end">
+      <code class="bar-endpoint" aria-hidden="true">/vaults/notes/mcp</code>
+      <div class="segmented lang-switch" role="group" aria-label="Language" data-ru-aria-label="Язык">
+        <button type="button" data-lang-set="en" aria-pressed="true">EN</button>
+        <button type="button" data-lang-set="ru" aria-pressed="false">RU</button>
+      </div>
+      <button class="icon-button" id="theme" type="button" aria-label="Theme: system" data-ru-aria-label="Тема">
+        <svg class="pixel" viewBox="0 0 8 8" aria-hidden="true"><path id="theme-icon"/></svg>
+      </button>
+      <a class="icon-button" href="https://github.com/rokokol/obsidian-thing" aria-label="Obsidian Thing on GitHub" data-ru-aria-label="Obsidian Thing на GitHub">
+        <span class="icon-github" aria-hidden="true"></span>
+      </a>
+    </div>
+  </div>
+</header>
+<main id="main">
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker" data-ru="Инструменты">Tools</span>
+        <h1 data-ru="Каждый инструмент и переключатель, который его даёт">Every tool, and the switch that offers it</h1>
+        <p data-ru="Имена и аргументы ниже сверяются с кодом сервера при каждом прогоне тестов, поэтому список не отстаёт от сборки">The names and arguments below are checked against the server code on every test run, so the list cannot fall behind the build</p>
+      </div>
+
+      <div class="filters" data-filter-set role="group" aria-label="Filter tools" data-ru-aria-label="Фильтр инструментов">
+        <button class="button" type="button" data-filter="all" aria-pressed="true" data-ru="Все 32">All 32</button>
+        <button class="button" type="button" data-filter="always" aria-pressed="false" data-ru="Всегда 11">Always 11</button>
+        <button class="button" type="button" data-filter="writable" aria-pressed="false" data-ru="Запись 7">Writing 7</button>
+        <button class="button" type="button" data-filter="integrations" aria-pressed="false" data-ru="Интеграции 8">Integrations 8</button>
+        <button class="button" type="button" data-filter="search" aria-pressed="false" data-ru="Поиск 6">Search 6</button>
+      </div>
+
+      <div class="tool-group" data-group-table>
+        <h2 data-ru="Один волт, разные наборы">One vault, several sets</h2>
+        <p data-ru="Клиент видит только те инструменты, которые разрешает конфигурация его волта. Чтение доступно всегда, запись — только в волте с writable = true, а инструменты поиска — когда задан state_dir">A client sees only the tools that its vault's configuration allows. Reading is always on, writing only in a vault with <code>writable = true</code>, and the search tools only when <code>state_dir</code> is set</p>
+      </div>
+
+      <div class="tool-group" data-group-table>
+        <h2 data-ru="Всегда">Always</h2>
+        <p data-ru="Эти одиннадцать есть в любом волте. Каждый применяет allowlist, отказывает скрытым путям и симлинкам">These eleven exist in every vault. Each one applies the allowlist and refuses hidden paths and symbolic links</p>
+        <div class="table-wrap">
+          <table>
+            <caption data-ru="Инструменты чтения и инструкций">Reading and instruction tools</caption>
+            <thead>
+              <tr>
+                <th scope="col" data-ru="Инструмент">Tool</th>
+                <th scope="col" data-ru="Аргументы">Arguments</th>
+                <th scope="col" data-ru="Ответ">Returns</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr data-group="always"><th scope="row" class="tool-name"><code>obsidian.allowed</code></th><td data-ru="нет">&mdash;</td><td data-ru="Разрешённые пути относительно корня волта">The allowed paths of the vault</td></tr>
+              <tr data-group="always"><th scope="row" class="tool-name"><code>obsidian.agentsmd</code></th><td data-ru="нет">&mdash;</td><td data-ru="Первый читаемый файл инструкций, с ревизией">The first readable instruction file, with its revision</td></tr>
+              <tr data-group="always"><th scope="row" class="tool-name"><code>obsidian.skills_list</code></th><td data-ru="нет">&mdash;</td><td data-ru="Имя, описание и путь SKILL.md каждого скилла">The name, description and SKILL.md path of each skill</td></tr>
+              <tr data-group="always"><th scope="row" class="tool-name"><code>obsidian.skill_read</code></th><td><code>name</code>, <code>path</code></td><td data-ru="Файл скилла. path по умолчанию SKILL.md">A file of the skill. <code>path</code> is <code>SKILL.md</code> by default</td></tr>
+              <tr data-group="always"><th scope="row" class="tool-name"><code>obsidian.memory_list</code></th><td data-ru="нет">&mdash;</td><td data-ru="Заметки памяти с типом и ревизией">The memory notes with their type and revision</td></tr>
+              <tr data-group="always"><th scope="row" class="tool-name"><code>obsidian.memory_read</code></th><td><code>name</code></td><td data-ru="Одна заметка памяти или MEMORY.md">One memory note, or <code>MEMORY.md</code></td></tr>
+              <tr data-group="always"><th scope="row" class="tool-name"><code>obsidian.read</code></th><td><code>path</code></td><td data-ru="Путь, содержимое и SHA-256 байтов">The path, the content and the SHA-256 of the bytes</td></tr>
+              <tr data-group="always"><th scope="row" class="tool-name"><code>obsidian.stat</code></th><td><code>path</code></td><td data-ru="Ревизия и размер без содержимого">The revision and the size, without the content</td></tr>
+              <tr data-group="always"><th scope="row" class="tool-name"><code>obsidian.links_out</code></th><td><code>path</code></td><td data-ru="Ссылки с целью, якорем и статусом">The links with their target, anchor and status</td></tr>
+              <tr data-group="always"><th scope="row" class="tool-name"><code>obsidian.links_in</code></th><td><code>path</code></td><td data-ru="Обратные ссылки и пропущенные документы">The backlinks, and the documents it could not inspect</td></tr>
+              <tr data-group="always"><th scope="row" class="tool-name"><code>obsidian.media</code></th><td><code>path</code></td><td data-ru="Вложения: путь, тип, размер. Не байты">The attachments: path, type, size. Never the bytes</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="tool-group" data-group-table>
+        <h2 data-ru="Запись">Writing</h2>
+        <p data-ru="Семь инструментов волта с <code>writable = true</code>. delete появляется, когда задана корзина, а memory_delete и memory_index_write работают только с каталогом памяти">Seven tools for a vault with <code>writable = true</code>. <code>delete</code> appears when a trash is configured, and the two memory writers work on the memory directory alone</p>
+        <div class="table-wrap">
+          <table>
+            <caption data-ru="Инструменты записи">Writing tools</caption>
+            <thead>
+              <tr>
+                <th scope="col" data-ru="Инструмент">Tool</th>
+                <th scope="col" data-ru="Аргументы">Arguments</th>
+                <th scope="col" data-ru="Ответ">Returns</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr data-group="writable"><th scope="row" class="tool-name"><code>obsidian.write</code></th><td><code>path</code>, <code>content</code>, <code>expected_revision</code>, <code>all_warnings</code></td><td data-ru="Новая ревизия и предупреждения">The new revision and any warning</td></tr>
+              <tr data-group="writable"><th scope="row" class="tool-name"><code>obsidian.update</code></th><td><code>path</code>, <code>old</code>, <code>new</code>, <code>expected_revision</code></td><td data-ru="Новая ревизия после одной замены">The new revision after one replacement</td></tr>
+              <tr data-group="writable"><th scope="row" class="tool-name"><code>obsidian.rename</code></th><td><code>path</code>, <code>new_name</code>, <code>expected_revision</code></td><td data-ru="Новый путь и документы, где правились ссылки">The new path, and the documents whose links changed</td></tr>
+              <tr data-group="writable"><th scope="row" class="tool-name"><code>obsidian.delete</code></th><td><code>path</code>, <code>expected_revision</code></td><td data-ru="Путь и идентификатор корзины">The path and the trash identifier</td></tr>
+              <tr data-group="writable"><th scope="row" class="tool-name"><code>obsidian.memory_write</code></th><td><code>name</code>, <code>content</code>, <code>expected_revision</code></td><td data-ru="Новая ревизия заметки и строки в MEMORY.md">The new revision of the note and of its line in <code>MEMORY.md</code></td></tr>
+              <tr data-group="writable"><th scope="row" class="tool-name"><code>obsidian.memory_delete</code></th><td><code>name</code>, <code>expected_revision</code></td><td data-ru="Путь, ревизия, корзина и новая ревизия MEMORY.md">The path, the revision, the trash, and the new revision of <code>MEMORY.md</code></td></tr>
+              <tr data-group="writable"><th scope="row" class="tool-name"><code>obsidian.memory_index_write</code></th><td><code>content</code>, <code>expected_revision</code></td><td data-ru="Новая ревизия MEMORY.md">The new revision of <code>MEMORY.md</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p data-ru="Каждый отказывает, если предложенный текст нарушит правило волта, сломает YAML, Canvas или Base, или если чекер вернёт отказ">Each one refuses when the proposed text breaks a vault rule, makes YAML, Canvas or Base invalid, or when the checker rejects the change</p>
+      </div>
+
+      <div class="tool-group" data-group-table>
+        <h2 data-ru="Интеграции">Integrations</h2>
+        <p data-ru="Восемь инструментов, каждый за своим переключателем. Структурные правки применяются пакетом: одна неудачная ступень оставляет файл как был">Eight tools, each behind its own switch. A structural edit applies as a batch: one failed step leaves the file as it was</p>
+        <div class="table-wrap">
+          <table>
+            <caption data-ru="Инструменты интеграций">Integration tools</caption>
+            <thead>
+              <tr>
+                <th scope="col" data-ru="Инструмент">Tool</th>
+                <th scope="col" data-ru="Аргументы">Arguments</th>
+                <th scope="col" data-ru="Ответ">Returns</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr data-group="integrations"><th scope="row" class="tool-name"><code>obsidian.canvas_edit</code></th><td><code>path</code>, <code>expected_revision</code>, <code>changes</code></td><td data-ru="Документ после узлов и рёбер пакета">The document after the node and edge batch</td></tr>
+              <tr data-group="integrations"><th scope="row" class="tool-name"><code>obsidian.base_edit</code></th><td><code>path</code>, <code>expected_revision</code>, <code>changes</code></td><td data-ru="Base после фильтров, формул и представлений">The Base after its filters, formulas and views</td></tr>
+              <tr data-group="integrations"><th scope="row" class="tool-name"><code>obsidian.iconic_set</code></th><td><code>path</code>, <code>changes</code></td><td data-ru="Иконка и цвет файла">The file's icon and colour</td></tr>
+              <tr data-group="integrations"><th scope="row" class="tool-name"><code>obsidian.fsrs_list</code></th><td><code>after</code>, <code>limit</code></td><td data-ru="Словари после пути и следующий курсор">The dictionaries after a path, and the next cursor</td></tr>
+              <tr data-group="integrations"><th scope="row" class="tool-name"><code>obsidian.fsrs_read</code></th><td><code>path</code>, <code>offset</code>, <code>limit</code></td><td data-ru="Карточки, их ячейки и состояние FSRS">The cards, their cells and their FSRS state</td></tr>
+              <tr data-group="integrations"><th scope="row" class="tool-name"><code>obsidian.fsrs_history</code></th><td><code>path</code>, <code>card_id</code>, <code>offset</code>, <code>limit</code></td><td data-ru="Записанные оценки повторений">The recorded review grades</td></tr>
+              <tr data-group="integrations"><th scope="row" class="tool-name"><code>obsidian.fsrs_edit</code></th><td><code>path</code>, <code>expected_revision</code>, <code>changes</code></td><td data-ru="Документ после созданных, изменённых и удалённых строк">The document after created, updated and deleted rows</td></tr>
+              <tr data-group="integrations"><th scope="row" class="tool-name"><code>obsidian.excalidraw_render</code></th><td><code>path</code>, <code>width</code></td><td data-ru="PNG сохранённого рисунка">A PNG of the saved drawing</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="tool-group" data-group-table>
+        <h2 data-ru="Поиск">Search</h2>
+        <p data-ru="Шесть инструментов волта с state_dir. related и map требуют профиля эмбеддинга, а map сервер прячет от всех, кроме клиента плагина">Six tools for a vault with <code>state_dir</code>. <code>related</code> and <code>map</code> need an embedding profile, and the server hides <code>map</code> from every client except the plugin</p>
+        <div class="table-wrap">
+          <table>
+            <caption data-ru="Инструменты поиска">Search tools</caption>
+            <thead>
+              <tr>
+                <th scope="col" data-ru="Инструмент">Tool</th>
+                <th scope="col" data-ru="Аргументы">Arguments</th>
+                <th scope="col" data-ru="Ответ">Returns</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr data-group="search"><th scope="row" class="tool-name"><code>obsidian.index</code></th><td><code>path</code></td><td data-ru="Ревизия и число фрагментов в индексе">The revision and the number of indexed fragments</td></tr>
+              <tr data-group="search"><th scope="row" class="tool-name"><code>obsidian.query</code></th><td><code>text</code>, <code>limit</code></td><td data-ru="Совпадения по файлам и признак отказа провайдера">The matches per file, and the provider-failure flag</td></tr>
+              <tr data-group="search"><th scope="row" class="tool-name"><code>obsidian.find</code></th><td><code>tags</code>, <code>aliases</code>, <code>properties</code>, <code>alias_property</code>, <code>filename_regex</code>, <code>limit</code></td><td data-ru="Пути в порядке путей">The paths, in path order</td></tr>
+              <tr data-group="search"><th scope="row" class="tool-name"><code>obsidian.status</code></th><td data-ru="нет">&mdash;</td><td data-ru="Покрытие, очередь, профиль, последний обход и расходы">Coverage, the queue, the profile, the last scan and the cost</td></tr>
+              <tr data-group="search"><th scope="row" class="tool-name"><code>obsidian.related</code></th><td><code>path</code>, <code>limit</code>, <code>min_score</code>, <code>section_line</code>, <code>include_paths</code>, <code>mime_types</code>, <code>exclude_linked</code></td><td data-ru="Соседи по убыванию оценки, по файлу на запись">The neighbours by score, one entry per file</td></tr>
+              <tr data-group="search"><th scope="row" class="tool-name"><code>obsidian.map</code></th><td data-ru="Те же, что у related">The same as <code>related</code></td><td data-ru="Те же файлы, плюс координаты и explained">The same files, plus coordinates and the explained share</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <p class="footnote" data-ru="Полный справочник по аргументам и условиям появления лежит в репозитории: &lt;a href=&quot;https://github.com/rokokol/obsidian-thing/blob/main/docs/tools.md&quot;&gt;docs/tools.md&lt;/a&gt; &lt;span aria-hidden=&quot;true&quot;&gt;↗&lt;/span&gt;">The full reference for arguments and gating lives in the repository: <a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/tools.md">docs/tools.md</a> <span aria-hidden="true">↗</span></p>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-inner">
+      <div>
+        <a class="brand" href="./index.html" aria-label="Obsidian Thing home" data-ru-aria-label="Obsidian Thing — главная">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span>Obsidian Thing</span>
+        </a>
+        <p class="footer-note" data-ru="Волт Obsidian за эндпоинтом MCP: чтение, запись, поиск и связи">An Obsidian vault behind an MCP endpoint: reading, writing, search and links</p>
+      </div>
+      <div>
+        <p class="footer-title" data-ru="Проект">Project</p>
+        <ul>
+          <li><a href="https://github.com/rokokol/obsidian-thing" data-ru="Исходники">Source</a></li>
+          <li><a href="https://github.com/rokokol/obsidian-thing/releases" data-ru="Релизы">Releases</a></li>
+          <li><a href="https://github.com/rokokol/obsidian-thing/pkgs/container/obsidian-thing" data-ru="Образ">Container</a></li>
+          <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/LICENSE" data-ru="Лицензия MIT">MIT licence</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-title" data-ru="Документация">Docs</p>
+        <ul>
+          <li><a href="./tools.html" data-ru="Инструменты">Tools</a></li>
+          <li><a href="./docs/connect.html" data-ru="Подключение">Connecting</a></li>
+          <li><a href="./docs/safety.html" data-ru="Права и правила">Permissions</a></li>
+          <li><a href="./docs/search.html" data-ru="Поиск">Search</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-title" data-ru="Сайт">Site</p>
+        <ul>
+          <li><a href="./index.html" data-ru="Обзор">Overview</a></li>
+          <li><a href="./features.html" data-ru="Возможности">Features</a></li>
+          <li><a href="./faq.html" data-ru="Вопросы">FAQ</a></li>
+          <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/CHANGELOG.md" data-ru="Изменения">Changelog</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-credit">
+      <p data-ru="Цвета и кит — из &lt;a href=&quot;https://github.com/rokokol/ddlc-themes&quot;&gt;ddlc-themes&lt;/a&gt;, сняты с ddlc.moe через &lt;a href=&quot;https://github.com/rokokol/ddlc-palette&quot;&gt;ddlc-palette&lt;/a&gt;. Шрифты Departure Mono и Mya Nunito — SIL OFL 1.1">Colours and kit from <a href="https://github.com/rokokol/ddlc-themes">ddlc-themes</a>, measured off ddlc.moe through <a href="https://github.com/rokokol/ddlc-palette">ddlc-palette</a>. The faces Departure Mono and Mya Nunito are SIL OFL 1.1</p>
+      <p data-ru="Obsidian — товарный знак Dynalist Inc. Проект с ним не связан. Doki Doki Literature Club — Team Salvato; проект не связан и не одобрен">Obsidian is a trademark of Dynalist Inc. This project is not affiliated with it. Doki Doki Literature Club belongs to Team Salvato, and this project is neither affiliated with nor endorsed by it</p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

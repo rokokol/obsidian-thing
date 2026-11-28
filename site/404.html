@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js" data-ddlc-heading="plain">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-ru="Такой страницы нет — Obsidian Thing">No such page — Obsidian Thing</title>
+<meta name="description" content="The page does not exist. Everything else does" data-ru-content="Такой страницы нет. Остальные на месте">
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222222" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/assets/vendor/ddlc/ddlc-tokens.css">
+<link rel="stylesheet" href="/assets/vendor/ddlc/ddlc-ui.css">
+<link rel="stylesheet" href="/assets/vendor/ddlc/ddlc-report.css">
+<link rel="stylesheet" href="/assets/site.css">
+<script>
+  (function () {
+    try {
+      var q = new URLSearchParams(location.search)
+      var pinned = q.get("theme")
+      var theme = pinned === "light" || pinned === "dark" ? pinned : localStorage.getItem("obsidian-thing-theme")
+      if (pinned === "light" || pinned === "dark") localStorage.setItem("obsidian-thing-theme", pinned)
+      if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme
+      var lang = q.get("lang")
+      var stored = localStorage.getItem("obsidian-thing-lang")
+      if (lang === "ru" || (lang !== "en" && stored === "ru")) document.documentElement.lang = "ru"
+    } catch (e) {}
+  })()
+</script>
+<script type="module" src="/assets/kit.js"></script>
+<script src="/assets/site.js" defer></script>
+</head>
+<body>
+<canvas class="cloud" id="cloud" aria-hidden="true"></canvas>
+<a class="skip" href="#main" data-ru="К содержанию">Skip to content</a>
+<header class="site-bar">
+  <div class="bar wrap bar-row">
+    <a class="brand" href="/index.html" aria-label="Obsidian Thing home" data-ru-aria-label="Obsidian Thing — главная">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>Obsidian Thing</span>
+    </a>
+    <p class="tagline" data-ru="Волт за эндпоинтом MCP">A vault behind an MCP endpoint</p>
+    <nav class="tabs" aria-label="Main" data-ru-aria-label="Основное">
+      <a href="/index.html" data-ru="Обзор">Overview</a>
+      <a href="/features.html" data-ru="Возможности">Features</a>
+      <a href="/tools.html" data-ru="Инструменты">Tools</a>
+      <a href="/docs/index.html" data-ru="Документация">Docs</a>
+      <a href="/faq.html" data-ru="Вопросы">FAQ</a>
+    </nav>
+    <div class="bar-end">
+      <div class="segmented lang-switch" role="group" aria-label="Language" data-ru-aria-label="Язык">
+        <button type="button" data-lang-set="en" aria-pressed="true">EN</button>
+        <button type="button" data-lang-set="ru" aria-pressed="false">RU</button>
+      </div>
+      <button class="icon-button" id="theme" type="button" aria-label="Theme: system" data-ru-aria-label="Тема">
+        <svg class="pixel" viewBox="0 0 8 8" aria-hidden="true"><path id="theme-icon"/></svg>
+      </button>
+      <a class="icon-button" href="https://github.com/rokokol/obsidian-thing" aria-label="Obsidian Thing on GitHub" data-ru-aria-label="Obsidian Thing на GitHub">
+        <span class="icon-github" aria-hidden="true"></span>
+      </a>
+    </div>
+  </div>
+</header>
+<main id="main">
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker" data-ru="Ошибка 404">Error 404</span>
+        <h1 data-ru="Такого пути в индексе нет">That path is not in the index</h1>
+        <p data-ru="Сервер ответил бы на него 404 так же, как на любой путь вне allowlist. Остальные страницы на месте">The server would answer this path with a 404, as it would any path outside the allowlist. The other pages are where they were</p>
+      </div>
+      <div class="grid grid-3">
+        <a class="card" href="/index.html">
+          <h3 data-ru="Обзор">Overview</h3>
+          <p data-ru="Что это и как поставить">What it is, and how to install it</p>
+        </a>
+        <a class="card" href="/tools.html">
+          <h3 data-ru="Инструменты">Tools</h3>
+          <p data-ru="Каждый инструмент и его аргументы">Every tool and its arguments</p>
+        </a>
+        <a class="card" href="/docs/index.html">
+          <h3 data-ru="Гайд">The guide</h3>
+          <p data-ru="Подключение, права и поиск">Connecting, permissions and search</p>
+        </a>
+      </div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-credit">
+      <p data-ru="Цвета и кит — из &lt;a href=&quot;https://github.com/rokokol/ddlc-themes&quot;&gt;ddlc-themes&lt;/a&gt;. Obsidian — товарный знак Dynalist Inc.; проект с ним не связан">Colours and kit from <a href="https://github.com/rokokol/ddlc-themes">ddlc-themes</a>. Obsidian is a trademark of Dynalist Inc., and this project is not affiliated with it</p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

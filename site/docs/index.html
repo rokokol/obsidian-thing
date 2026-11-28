@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js" data-ddlc-heading="plain">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-ru="Гайд — Obsidian Thing">The guide — Obsidian Thing</title>
+<meta name="description" content="How the pieces of Obsidian Thing fit: one endpoint per vault, one token, an allowlist and a set of tools" data-ru-content="Как устроен Obsidian Thing: эндпоинт на волт, токен, allowlist и набор инструментов">
+<meta property="og:type" content="article">
+<meta property="og:title" content="The guide — Obsidian Thing">
+<meta property="og:description" content="One endpoint per vault, one token, an allowlist and a set of tools">
+<meta property="og:image" content="https://obsidian-thing.rokokol.art/assets/cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Obsidian Thing: a vault on one endpoint, a token, and a call that returns a revision">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://obsidian-thing.rokokol.art/assets/cover.png">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222222" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../assets/vendor/ddlc/ddlc-tokens.css">
+<link rel="stylesheet" href="../assets/vendor/ddlc/ddlc-ui.css">
+<link rel="stylesheet" href="../assets/vendor/ddlc/ddlc-report.css">
+<link rel="stylesheet" href="../assets/site.css">
+<script>
+  (function () {
+    try {
+      var q = new URLSearchParams(location.search)
+      var pinned = q.get("theme")
+      var theme = pinned === "light" || pinned === "dark" ? pinned : localStorage.getItem("obsidian-thing-theme")
+      if (pinned === "light" || pinned === "dark") localStorage.setItem("obsidian-thing-theme", pinned)
+      if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme
+      var lang = q.get("lang")
+      var stored = localStorage.getItem("obsidian-thing-lang")
+      if (lang === "ru" || (lang !== "en" && stored === "ru")) document.documentElement.lang = "ru"
+    } catch (e) {}
+  })()
+</script>
+<script type="module" src="../assets/kit.js"></script>
+<script src="../assets/site.js" defer></script>
+</head>
+<body>
+<canvas class="cloud" id="cloud" aria-hidden="true"></canvas>
+<a class="skip" href="#main" data-ru="К содержанию">Skip to content</a>
+<header class="site-bar">
+  <div class="bar wrap bar-row">
+    <a class="brand" href="../index.html" aria-label="Obsidian Thing home" data-ru-aria-label="Obsidian Thing — главная">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>Obsidian Thing</span>
+    </a>
+    <p class="tagline" data-ru="Волт за эндпоинтом MCP">A vault behind an MCP endpoint</p>
+    <nav class="tabs" aria-label="Main" data-ru-aria-label="Основное">
+      <a href="../index.html" data-ru="Обзор">Overview</a>
+      <a href="../features.html" data-ru="Возможности">Features</a>
+      <a href="../tools.html" data-ru="Инструменты">Tools</a>
+      <a href="./index.html" aria-current="page" data-ru="Документация">Docs</a>
+      <a href="../faq.html" data-ru="Вопросы">FAQ</a>
+    </nav>
+    <div class="bar-end">
+      <code class="bar-endpoint" aria-hidden="true">/vaults/notes/mcp</code>
+      <div class="segmented lang-switch" role="group" aria-label="Language" data-ru-aria-label="Язык">
+        <button type="button" data-lang-set="en" aria-pressed="true">EN</button>
+        <button type="button" data-lang-set="ru" aria-pressed="false">RU</button>
+      </div>
+      <button class="icon-button" id="theme" type="button" aria-label="Theme: system" data-ru-aria-label="Тема">
+        <svg class="pixel" viewBox="0 0 8 8" aria-hidden="true"><path id="theme-icon"/></svg>
+      </button>
+      <a class="icon-button" href="https://github.com/rokokol/obsidian-thing" aria-label="Obsidian Thing on GitHub" data-ru-aria-label="Obsidian Thing на GitHub">
+        <span class="icon-github" aria-hidden="true"></span>
+      </a>
+    </div>
+  </div>
+</header>
+<main id="main">
+  <div class="wrap doc-layout">
+    <aside class="doc-nav" aria-label="Guide" data-ru-aria-label="Гайд">
+      <p class="doc-nav-title" data-ru="Гайд">Guide</p>
+      <ul>
+        <li><a href="./index.html" aria-current="page" data-ru="Обзор">Overview</a></li>
+        <li><a href="./connect.html" data-ru="Подключение">Connecting</a></li>
+        <li><a href="./safety.html" data-ru="Права и правила">Permissions</a></li>
+        <li><a href="./search.html" data-ru="Поиск и расходы">Search and cost</a></li>
+      </ul>
+      <p class="doc-nav-title" data-ru="Справочник">Reference</p>
+      <ul>
+        <li><a href="../tools.html" data-ru="Инструменты">Tools</a></li>
+        <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/config.md">config.md ↗</a></li>
+        <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/deployment.md">deployment.md ↗</a></li>
+        <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/agents.md">agents.md ↗</a></li>
+        <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/semantic-search.md">semantic-search.md ↗</a></li>
+      </ul>
+    </aside>
+    <article class="doc-body">
+      <h1 data-ru="Как устроен сервер">How the server is arranged</h1>
+      <p data-ru="Один процесс читает TOML-файл и поднимает по эндпоинту на каждый волт. У эндпоинта свой токен, свой allowlist и свой набор инструментов; общего между волтами нет ничего, кроме процесса">One process reads a TOML file and mounts an endpoint for each vault. Each endpoint has its own token, its own allowlist and its own set of tools. Nothing is shared between vaults except the process</p>
+
+      <h2 data-ru="Три вещи, которые нужны клиенту">The three things a client needs</h2>
+      <div class="grid grid-3">
+        <div class="card">
+          <span class="num-sticker">01</span>
+          <h3 data-ru="Эндпоинт">The endpoint</h3>
+          <p data-ru="http://127.0.0.1:8765/vaults/&lt;vault_id&gt;/mcp. Идентификатор волта — имя таблицы в TOML">http://127.0.0.1:8765/vaults/&lt;vault_id&gt;/mcp. The vault ID is the name of its table in the TOML file</p>
+        </div>
+        <div class="card">
+          <span class="num-sticker">02</span>
+          <h3 data-ru="Токен">The token</h3>
+          <p data-ru="Authorization: Bearer &lt;token&gt;. Токен берётся из переменной окружения, названной в token_env">Authorization: Bearer &lt;token&gt;. The server reads it from the environment variable that token_env names</p>
+        </div>
+        <div class="card">
+          <span class="num-sticker">03</span>
+          <h3 data-ru="Доступ">The access</h3>
+          <p data-ru="Список путей в allowed. Файл разрешает себя, каталог — поддерево, а . открывает весь волт">The list of paths in <code>allowed</code>. A file allows itself, a directory allows its subtree, and <code>.</code> opens the whole vault</p>
+        </div>
+      </div>
+
+      <h2 data-ru="Что происходит при вызове">What happens on a call</h2>
+      <p data-ru="Сервер не держит сессию: Streamable HTTP здесь без состояния, и каждый POST несёт свой токен. Поэтому вызов можно повторить, не восстанавливая рукопожатие">The server holds no session: Streamable HTTP is stateless here, and every POST carries its own token. A call can therefore be repeated without restoring a handshake</p>
+      <ol>
+        <li data-ru="Транспорт сверяет Host с allowed_hosts и токен с bearer-ом волта. Ответ на чужое — 401 или 421">The transport compares <code>Host</code> with <code>allowed_hosts</code> and the token with the vault's bearer. A wrong one gets 401 or 421</li>
+        <li data-ru="Инструмент разбирает путь и оставляет только то, что разрешает allowlist и не является скрытым путём или симлинком">The tool resolves the path and keeps only what the allowlist permits and what is neither a hidden path nor a symbolic link</li>
+        <li data-ru="Чтение идёт с диска, поиск — по локальному индексу, запись — во временный файл рядом с целью">A read comes from disk, a search from the local index, and a write to a temporary file beside its target</li>
+        <li data-ru="Перед заменой файла сервер проверяет ревизию, правила волта и чекер, и только потом переименовывает временный файл">Before it replaces the file the server checks the revision, the vault rules and the checker, and only then renames the temporary file</li>
+      </ol>
+
+      <h2 data-ru="Куда читать дальше">Where to read next</h2>
+      <div class="grid grid-3">
+        <a class="card" href="./connect.html">
+          <h3 data-ru="Подключить клиент">Connect a client</h3>
+          <p data-ru="Конфигурация, токен, первый вызов и плагин Obsidian">Configuration, the token, the first call and the Obsidian plugin</p>
+        </a>
+        <a class="card" href="./safety.html">
+          <h3 data-ru="Права и правила">Permissions</h3>
+          <p data-ru="Allowlist, ревизии, корзина, правила и чекер">The allowlist, revisions, the trash, the rules and the checker</p>
+        </a>
+        <a class="card" href="./search.html">
+          <h3 data-ru="Поиск и расходы">Search and cost</h3>
+          <p data-ru="Индекс, провайдеры, бюджет и журнал вызовов">The index, the providers, the budget and the call journal</p>
+        </a>
+      </div>
+
+      <h2 data-ru="Справочник в репозитории">The reference in the repository</h2>
+      <p data-ru="Числа, ключи и значения живут в docs/ репозитория, и эти страницы их не пересказывают: иначе копия разойдётся с оригиналом на первой же правке">The numbers, keys and values live in the repository's <code>docs/</code>, and these pages do not retell them: a copy would drift from the original on the first edit</p>
+      <ul>
+        <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/tools.md">docs/tools.md</a> &mdash; <span data-ru="каждый инструмент, его аргументы и переключатель">every tool, its arguments and its switch</span></li>
+        <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/config.md">docs/config.md</a> &mdash; <span data-ru="каждый ключ TOML и отказы при старте">every TOML key, and what the server refuses at start</span></li>
+        <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/deployment.md">docs/deployment.md</a> &mdash; <span data-ru="Nix, Docker, обратный прокси, корзина и состояние">Nix, Docker, a reverse proxy, the trash and the state</span></li>
+        <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/agents.md">docs/agents.md</a> &mdash; <span data-ru="инструкции, скиллы и память волта">the instructions, skills and memory of a vault</span></li>
+        <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/vault-rules.md">docs/vault-rules.md</a> &mdash; <span data-ru="правила Markdown для записи">the Markdown rules for a write</span></li>
+        <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/checker.md">docs/checker.md</a> &mdash; <span data-ru="свой скрипт проверки перед записью">your own script before a write</span></li>
+        <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/graph.md">docs/graph.md</a> &mdash; <span data-ru="ссылки, вложения, удаление и переименование">links, attachments, deletion and rename</span></li>
+        <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/semantic-search.md">docs/semantic-search.md</a> &mdash; <span data-ru="индекс, провайдеры, вложения, расходы и Prometheus">the index, providers, attachments, cost and Prometheus</span></li>
+      </ul>
+      <div class="doc-next">
+        <a class="button" href="./connect.html" data-ru="Дальше: подключение →">Next: connecting <span aria-hidden="true">→</span></a>
+        <a class="button" href="../index.html" data-ru="← Обзор">← Overview</a>
+      </div>
+    </article>
+  </div>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-inner">
+      <div>
+        <a class="brand" href="../index.html" aria-label="Obsidian Thing home" data-ru-aria-label="Obsidian Thing — главная">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span>Obsidian Thing</span>
+        </a>
+        <p class="footer-note" data-ru="Волт Obsidian за эндпоинтом MCP: чтение, запись, поиск и связи">An Obsidian vault behind an MCP endpoint: reading, writing, search and links</p>
+      </div>
+      <div>
+        <p class="footer-title" data-ru="Проект">Project</p>
+        <ul>
+          <li><a href="https://github.com/rokokol/obsidian-thing" data-ru="Исходники">Source</a></li>
+          <li><a href="https://github.com/rokokol/obsidian-thing/releases" data-ru="Релизы">Releases</a></li>
+          <li><a href="https://github.com/rokokol/obsidian-thing/pkgs/container/obsidian-thing" data-ru="Образ">Container</a></li>
+          <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/LICENSE" data-ru="Лицензия MIT">MIT licence</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-title" data-ru="Документация">Docs</p>
+        <ul>
+          <li><a href="../tools.html" data-ru="Инструменты">Tools</a></li>
+          <li><a href="./connect.html" data-ru="Подключение">Connecting</a></li>
+          <li><a href="./safety.html" data-ru="Права и правила">Permissions</a></li>
+          <li><a href="./search.html" data-ru="Поиск">Search</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-title" data-ru="Сайт">Site</p>
+        <ul>
+          <li><a href="../index.html" data-ru="Обзор">Overview</a></li>
+          <li><a href="../features.html" data-ru="Возможности">Features</a></li>
+          <li><a href="../faq.html" data-ru="Вопросы">FAQ</a></li>
+          <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/CHANGELOG.md" data-ru="Изменения">Changelog</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-credit">
+      <p data-ru="Цвета и кит — из &lt;a href=&quot;https://github.com/rokokol/ddlc-themes&quot;&gt;ddlc-themes&lt;/a&gt;, сняты с ddlc.moe через &lt;a href=&quot;https://github.com/rokokol/ddlc-palette&quot;&gt;ddlc-palette&lt;/a&gt;. Шрифты Departure Mono и Mya Nunito — SIL OFL 1.1">Colours and kit from <a href="https://github.com/rokokol/ddlc-themes">ddlc-themes</a>, measured off ddlc.moe through <a href="https://github.com/rokokol/ddlc-palette">ddlc-palette</a>. The faces Departure Mono and Mya Nunito are SIL OFL 1.1</p>
+      <p data-ru="Obsidian — товарный знак Dynalist Inc. Проект с ним не связан. Doki Doki Literature Club — Team Salvato; проект не связан и не одобрен">Obsidian is a trademark of Dynalist Inc. This project is not affiliated with it. Doki Doki Literature Club belongs to Team Salvato, and this project is neither affiliated with nor endorsed by it</p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

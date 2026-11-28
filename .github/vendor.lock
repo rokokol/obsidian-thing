@@ -5,3 +5,13 @@ vendor-sync.sh rokokol/ci-skill templates/vendor-sync.sh f68f1e45aa90fb95aab8bb2
 check-pins.sh rokokol/ci-skill templates/check-pins.sh f68f1e45aa90fb95aab8bb2f94cfc07b06a712b5 c86f8288606d532f7982206eea8e8a310315d7f6
 scripts/no-secrets.sh rokokol/ci-skill templates/no-secrets.sh f68f1e45aa90fb95aab8bb2f94cfc07b06a712b5 8d01f506140d058f254ebb962b5bc232f6c05c00
 .github/workflows/vendor-sync.yml rokokol/ci-skill templates/github/workflows/vendor-sync.yml f68f1e45aa90fb95aab8bb2f94cfc07b06a712b5 a5bde77f98d55a43b2c993f4c96a952e0b68010d manual
+site/assets/vendor/ddlc/ddlc-tokens.css rokokol/ddlc-themes dist/ddlc-tokens.css 3084c7123940ff4088b097c483c285061b159ddc b23d4ef1456ed7743fdb44a13f6dc3d78d26efad
+site/assets/vendor/ddlc/ddlc-ui.css rokokol/ddlc-themes dist/ddlc-ui.css 3084c7123940ff4088b097c483c285061b159ddc a454d30941a8d4de4bb0086b046ef618fa14c042
+site/assets/vendor/ddlc/ddlc-report.css rokokol/ddlc-themes dist/ddlc-report.css 3084c7123940ff4088b097c483c285061b159ddc df84c50961c5140f0a7813e93dc37195520b2f28
+site/assets/vendor/ddlc/ddlc-theme.js rokokol/ddlc-themes dist/ddlc-theme.js 3084c7123940ff4088b097c483c285061b159ddc 12ec9eda878a5794061bb7bd21d71dd4feddd045
+site/assets/vendor/ddlc/ddlc-cloud.js rokokol/ddlc-themes dist/ddlc-cloud.js 3084c7123940ff4088b097c483c285061b159ddc 981b9b58d7b5be7a61f2b7b4ab06c6d3b5a9fdf8
+site/assets/vendor/ddlc/DepartureMono-Regular.woff2 rokokol/ddlc-themes dist/DepartureMono-Regular.woff2 3084c7123940ff4088b097c483c285061b159ddc b4a23dc1dad1c934005d0862e62c0294636afb08
+site/assets/vendor/ddlc/MyaNunito.woff2 rokokol/ddlc-themes dist/MyaNunito.woff2 3084c7123940ff4088b097c483c285061b159ddc 9cafbdfdf5f6c478a63083c683264b9fa3b20288
+site/assets/vendor/ddlc/MyaNunito-Italic.woff2 rokokol/ddlc-themes dist/MyaNunito-Italic.woff2 3084c7123940ff4088b097c483c285061b159ddc a614d128dc9c5955067df5584b3d5beaa36425c6
+site/assets/vendor/ddlc/DepartureMono-LICENSE.txt rokokol/ddlc-themes dist/DepartureMono-LICENSE.txt 3084c7123940ff4088b097c483c285061b159ddc de52476183807bbfc04e8ae7bced1dc9cbcbfd2f
+site/assets/vendor/ddlc/MyaNunito-LICENSE.txt rokokol/ddlc-themes dist/MyaNunito-LICENSE.txt 3084c7123940ff4088b097c483c285061b159ddc 61526872c23ea450f97a6e9701cf9ff479ca095f

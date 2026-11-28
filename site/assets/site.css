@@ -1,0 +1,1271 @@
+/* SPDX-License-Identifier: MIT */
+/* The Obsidian Thing site's layer over the DDLC web kit.
+   ddlc-ui.css lays the page out of .bar, .work and .card and owns the pixel grid;
+   ddlc-report.css brings the prose sheet, the taped quote and the "Just Monika." pop-up.
+   This file adds only what the kit has no class for: the hero and its index lattice, the
+   endpoint card, stickers, the neighbourhood pop-up, the documentation layout and the
+   footer. Every colour here is a --ddlc-* role, so both variants follow. The shape of the
+   layer follows the MolvAI site's, which sits on the same kit and the same owner */
+
+/* ---------- the report sheet under the kit ---------- */
+
+/* ddlc-report.css is written for a 46rem report column. The kit's .bar, .work and .card lay
+   a page out instead, so the column is lifted and the pixel grid restored */
+body {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  font: var(--ddlc-size) / 2 var(--ddlc-font-data);
+  -webkit-font-smoothing: none;
+  font-smooth: never;
+}
+
+/* Long text reads in the DDLC prose face rather than the system sans of .prose */
+.prose {
+  font: 500 15px / 1.6 var(--ddlc-font-prose);
+}
+
+/* A heading in the kit is a pixel label, in prose a title. The report sheet sets the title
+   face and no size; the sizes below are whole multiples of the 11 px grid */
+h1,
+h2,
+h3 {
+  margin: 0 0 8px;
+}
+
+h1 {
+  font-size: var(--ddlc-size-huge);
+  line-height: 1.1;
+}
+
+/* The report sheet draws a rule under every h1. A documentation page keeps it, because the
+   rule belongs to its title. A slogan on the pixel grid does not: there the rule cuts the
+   line it underlines */
+h1 {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.doc-body h1 {
+  padding-bottom: 0.55rem;
+  border-bottom: 2px solid var(--ddlc-line);
+}
+
+h2 {
+  font-size: var(--ddlc-size-big);
+  line-height: 1.2;
+}
+
+h3 {
+  font-size: 17px;
+}
+
+/* ---------- the page ---------- */
+
+.wrap {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--ddlc-gap);
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+}
+
+.skip:focus {
+  left: 8px;
+  top: 8px;
+  z-index: 20;
+  padding: 4px 12px;
+  border: 2px solid var(--ddlc-text);
+  background: var(--ddlc-ground);
+  color: var(--ddlc-text);
+}
+
+/* The kit's bar, pinned. The border spans the viewport, so it sits on the outer element and
+   .bar-row carries the row inside the wrap */
+.site-bar {
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  border-bottom: 2px solid var(--ddlc-line);
+  background: var(--ddlc-ground);
+}
+
+.bar-row {
+  padding: 12px 0;
+  border-bottom: 0;
+}
+
+/* The mark is a mask, not a picture: the file gives the shape, and the accent role of the
+   page gives the colour, so the light theme gets a dark mark and the dark theme gets a light
+   one. The site's own switch decides, not the operating system. The 45 % staircase of the
+   file survives as a 45 % alpha in the mask, which is what keeps the lattice a lattice */
+.brand-mark {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  background-color: var(--ddlc-accent);
+  -webkit-mask: url("./logo.svg") center / contain no-repeat;
+  mask: url("./logo.svg") center / contain no-repeat;
+}
+
+/* The footer mark is the same mark, one size down so it sits beside a line of prose. Both
+   sizes are whole multiples of the 16-unit grid of the file: 22 px is the bar, 16 px is the
+   footer, and a multiple keeps every cell on a pixel */
+.site-footer .brand-mark {
+  width: 16px;
+  height: 16px;
+}
+
+/* The navigation is a row of links, so it takes the kit's tab row and the tab's chosen state */
+.tabs {
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.tabs a {
+  padding: 4px 10px;
+  border: 2px solid transparent;
+  color: var(--ddlc-muted);
+  text-decoration: none;
+}
+
+.tabs a:hover {
+  color: var(--ddlc-text);
+}
+
+.tabs a[aria-current="page"] {
+  border-color: var(--ddlc-text);
+  color: var(--ddlc-text);
+  box-shadow: 2px 2px 0 var(--ddlc-accent);
+}
+
+.icon-github {
+  width: 16px;
+  height: 16px;
+  background-color: currentColor;
+  mask: url("./icon-github.svg") center / contain no-repeat;
+}
+
+.lang-switch button {
+  flex: none;
+  padding: 2px 8px;
+}
+
+/* The endpoint of the current page, in the bar: one address, one token */
+.bar-endpoint {
+  padding: 0 8px;
+  border: 2px solid var(--ddlc-line);
+  background: var(--ddlc-code-ground);
+  color: var(--ddlc-muted);
+  font-size: var(--ddlc-size);
+  white-space: nowrap;
+}
+
+@media (max-width: 1100px) {
+  .bar-endpoint {
+    display: none;
+  }
+}
+
+/* ---------- the hero ---------- */
+
+.hero {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 2px solid var(--ddlc-line);
+}
+
+/* The lattice that kit.js draws: the index reading the vault, one cell at a time. It fills the
+   corner behind the card and fades before any sentence, so the hero stays one texture */
+.lattice {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  image-rendering: pixelated;
+  mask-image: radial-gradient(135% 115% at 88% -10%, black 0%, black 42%, transparent 74%);
+  -webkit-mask-image: radial-gradient(135% 115% at 88% -10%, black 0%, black 42%, transparent 74%);
+}
+
+.hero-inner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: calc(var(--ddlc-gap) * 2);
+  align-items: center;
+  padding-top: 64px;
+  padding-bottom: 64px;
+}
+
+@media (max-width: 940px) {
+  .hero-inner {
+    grid-template-columns: minmax(0, 1fr);
+    padding-top: 40px;
+    padding-bottom: 40px;
+  }
+}
+
+.hero h1 {
+  font-family: var(--ddlc-font-data);
+  font-weight: 400;
+  font-variation-settings: normal;
+  font-size: var(--ddlc-size-huge);
+  line-height: 1.14;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+  text-shadow: 2px 2px 0 var(--ddlc-line-live);
+}
+
+.hero h1 em {
+  font-style: normal;
+  color: var(--ddlc-accent);
+}
+
+.hero .lead {
+  max-width: 52ch;
+  margin: 16px 0 24px;
+  color: var(--ddlc-muted);
+  font: 500 17px / 1.55 var(--ddlc-font-prose);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.actions .button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  padding: 0 8px;
+  border: 2px solid var(--ddlc-line-live);
+  background: var(--ddlc-ground);
+  color: var(--ddlc-text);
+  box-shadow: 2px 2px 0 var(--ddlc-accent);
+}
+
+/* ---------- the endpoint card ---------- */
+
+/* One call, drawn: the address, the token that reaches it and what the server answered. It
+   is an illustration of the wire, not a screenshot, and nothing on the page sends a request */
+.endpoint-card {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px var(--ddlc-gap) var(--ddlc-gap);
+  border: 2px solid var(--ddlc-text);
+  background: var(--ddlc-panel);
+  box-shadow: 6px 6px 0 var(--ddlc-line);
+  transform: rotate(-0.5deg);
+}
+
+.endpoint-head,
+.endpoint-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ddlc-gap);
+}
+
+.endpoint-head {
+  color: var(--ddlc-muted);
+}
+
+.endpoint-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ddlc-text);
+}
+
+.endpoint-dot {
+  width: 11px;
+  height: 11px;
+  background: var(--ddlc-ok);
+  box-shadow: 0 0 0 2px var(--ddlc-panel);
+  animation: pulse 2.4s steps(2, end) infinite;
+}
+
+@keyframes pulse {
+  50% {
+    background: var(--ddlc-switch-off);
+  }
+}
+
+.endpoint-path {
+  margin: 0;
+  padding: 6px 10px;
+  border: 2px solid var(--ddlc-line);
+  background: var(--ddlc-code-ground);
+  font-size: var(--ddlc-size-big);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.endpoint-path b {
+  color: var(--ddlc-accent);
+  font-weight: 400;
+  font-size: inherit;
+}
+
+.endpoint-token {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ddlc-muted);
+  font-size: var(--ddlc-size);
+}
+
+.endpoint-token code {
+  padding: 0 4px;
+  background: var(--ddlc-code-ground);
+  color: var(--ddlc-text);
+}
+
+/* A call and its latency: the column of a transcript, in the data face */
+.calls {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 8px 10px;
+  border: 2px solid var(--ddlc-line);
+  background: var(--ddlc-code-ground);
+  list-style: none;
+  font-size: var(--ddlc-size);
+  line-height: 1.8;
+}
+
+.calls li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* A hit is a path, a section and a score, so it is one line that starts under the call */
+.calls .hit {
+  display: block;
+  padding-left: 12px;
+  text-indent: -12px;
+  color: var(--ddlc-text);
+  overflow-wrap: anywhere;
+}
+
+.calls .hit .score {
+  float: right;
+  margin-left: 8px;
+  color: var(--ddlc-accent);
+}
+
+.calls .hit b {
+  color: var(--ddlc-accent);
+  font-weight: 400;
+}
+
+.calls .hit::before {
+  content: "▸ ";
+  color: var(--ddlc-accent);
+  text-indent: 0;
+}
+
+.calls .tool-name {
+  color: var(--ddlc-link);
+  overflow-wrap: anywhere;
+}
+
+.calls .tool-ms {
+  flex: none;
+  color: var(--ddlc-muted);
+}
+
+.calls .sub {
+  color: var(--ddlc-muted);
+}
+
+.endpoint-foot {
+  margin: 0;
+  color: var(--ddlc-muted);
+  font-size: var(--ddlc-size);
+}
+
+.endpoint-card > .button {
+  width: fit-content;
+}
+
+/* ---------- the fact strip ---------- */
+
+.facts {
+  border-bottom: 2px solid var(--ddlc-line);
+  background: var(--ddlc-panel);
+}
+
+.facts-inner {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 12px var(--ddlc-gap);
+  padding: 16px var(--ddlc-gap);
+}
+
+.fact {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.fact .n {
+  font-size: var(--ddlc-size-big);
+  line-height: 1.4;
+  color: var(--ddlc-text);
+}
+
+.fact .n small {
+  font-size: var(--ddlc-size);
+  color: var(--ddlc-muted);
+}
+
+.fact .t {
+  color: var(--ddlc-muted);
+}
+
+/* ---------- sections ---------- */
+
+.section {
+  padding: 48px 0;
+  border-bottom: 2px solid var(--ddlc-line);
+}
+
+.section:last-of-type {
+  border-bottom: 0;
+}
+
+.section-head {
+  max-width: none;
+  margin-bottom: 24px;
+}
+
+.section-head p {
+  max-width: 62ch;
+  margin: 0;
+  color: var(--ddlc-muted);
+  font: 500 15px / 1.6 var(--ddlc-font-prose);
+}
+
+.kicker {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ddlc-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+/* A block that follows a table keeps the table's own bottom margin apart */
+.spaced {
+  margin-top: 16px;
+}
+
+.grid {
+  display: grid;
+  gap: var(--ddlc-gap);
+  align-items: start;
+}
+
+.grid-2 {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+}
+
+.grid-3 {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+}
+
+.grid-4 {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+}
+
+.card h3 {
+  margin-bottom: 8px;
+}
+
+.card .muted,
+.muted {
+  margin: 0;
+  color: var(--ddlc-muted);
+}
+
+/* Body copy reads in the prose face; the pixel grid keeps the labels and the readouts */
+p.muted,
+.card p {
+  font: 500 15px / 1.6 var(--ddlc-font-prose);
+}
+
+/* A name in prose is set in the data face and the accent role, without the report sheet's
+   chip: a sentence that names four tools otherwise reads as a form */
+.hero .lead code,
+.card p code,
+.card li code,
+.step p code,
+.section-head p code,
+.faq .answer code,
+.doc-body p code,
+.doc-body li code {
+  padding: 0;
+  background: none;
+  color: var(--ddlc-accent);
+  font-size: var(--ddlc-size);
+}
+
+.card a {
+  text-decoration-thickness: 2px;
+}
+
+a.card {
+  display: block;
+  color: var(--ddlc-text);
+  text-decoration: none;
+}
+
+a.card:hover {
+  border-color: var(--ddlc-accent);
+  box-shadow: 4px 4px 0 var(--ddlc-accent);
+}
+
+a.card:hover h3 {
+  color: var(--ddlc-accent);
+}
+
+.card ul {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card li {
+  position: relative;
+  padding-left: 16px;
+  color: var(--ddlc-muted);
+  font: 500 15px / 1.6 var(--ddlc-font-prose);
+}
+
+.card li::before {
+  content: "▸";
+  position: absolute;
+  left: 0;
+  color: var(--ddlc-accent);
+}
+
+.card code {
+  font-size: var(--ddlc-size);
+}
+
+/* A list of calls inside a card is a transcript, not a prose list: no bullet of the card and
+   no prose face, because a call is read in the data face */
+.card .calls li {
+  margin: 0;
+  padding-left: 0;
+  color: var(--ddlc-text);
+  font: inherit;
+}
+
+.card .calls li::before {
+  content: none;
+}
+
+.card .calls .hit {
+  display: block;
+  padding-left: 12px;
+  text-indent: -12px;
+}
+
+.card .calls .hit::before {
+  content: "▸ ";
+  color: var(--ddlc-accent);
+  text-indent: 0;
+}
+
+.card .calls .hit .score {
+  float: right;
+  color: var(--ddlc-accent);
+}
+
+/* ---------- stickers ---------- */
+
+.sticker {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 2px solid var(--ddlc-text);
+  background: var(--ddlc-ground);
+  color: var(--ddlc-text);
+  font: var(--ddlc-size) / 1.6 var(--ddlc-font-data);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  box-shadow: 3px 3px 0 var(--ddlc-accent);
+  transform: rotate(-1.5deg);
+}
+
+.sticker.alt {
+  transform: rotate(1.4deg);
+  box-shadow: 3px 3px 0 var(--ddlc-ok);
+}
+
+.sticker.quiet {
+  box-shadow: 3px 3px 0 var(--ddlc-line);
+  color: var(--ddlc-muted);
+}
+
+.card > .sticker {
+  display: flex;
+  width: max-content;
+  margin-bottom: 10px;
+}
+
+.num-sticker {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  margin-bottom: 12px;
+  border: 2px solid var(--ddlc-text);
+  background: var(--ddlc-accent);
+  color: var(--ddlc-on-accent);
+  font-size: var(--ddlc-size-big);
+  line-height: 1;
+  box-shadow: 3px 3px 0 var(--ddlc-text);
+  transform: rotate(-2deg);
+}
+
+/* ---------- numbers ---------- */
+
+.metric {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+
+.metric .big {
+  font-size: 33px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.metric .big small {
+  font-size: 15px;
+  color: var(--ddlc-muted);
+}
+
+.metric .label {
+  color: var(--ddlc-muted);
+}
+
+.footnote {
+  margin: 12px 0 0;
+  color: var(--ddlc-muted);
+  font-size: var(--ddlc-size);
+}
+
+/* ---------- steps ---------- */
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--ddlc-gap);
+  counter-reset: step;
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  padding: 12px 16px;
+  border: 2px solid var(--ddlc-line);
+  background: var(--ddlc-panel);
+  counter-increment: step;
+}
+
+.step::before {
+  content: counter(step, decimal-leading-zero);
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 2px solid var(--ddlc-text);
+  background: var(--ddlc-accent);
+  color: var(--ddlc-on-accent);
+  font-size: var(--ddlc-size-big);
+  line-height: 1;
+  transform: rotate(-2deg);
+}
+
+.step h3 {
+  margin-bottom: 4px;
+}
+
+.step p {
+  margin: 0 0 8px;
+  color: var(--ddlc-muted);
+  font: 500 15px / 1.6 var(--ddlc-font-prose);
+}
+
+.step p:last-child {
+  margin-bottom: 0;
+}
+
+/* ---------- the quote and the announcement ---------- */
+
+/* A principle, taped on. The tape and the board are the report sheet's blockquote */
+.quote {
+  max-width: 58ch;
+  margin: 0 auto;
+  transform: rotate(-0.5deg);
+}
+
+.quote blockquote {
+  margin-top: 32px;
+  padding: 24px 24px 16px;
+  font: 500 19px / 1.5 var(--ddlc-font-prose);
+}
+
+.quote figcaption {
+  margin-top: 8px;
+  color: var(--ddlc-muted);
+  text-align: right;
+}
+
+/* The "Just Monika." pop-up, used once, where the project states a position. The report sheet
+   draws its title as white letters in a thick plum outline, which reads on the pale island it
+   paints in both variants: an override would thin the outline and leave the letters barely
+   visible, so the title keeps the kit's own stroke */
+.ddlc-inform {
+  max-width: 58ch;
+  margin: 32px auto 0;
+}
+
+/* The pop-up title is white letters in a plum outline in the report sheet. Its island is pale
+   in both variants here, so the white fill leaves the outline alone and the words thin out.
+   The pop-up's own accent role is dark in both variants and keeps the title readable on that
+   ground */
+.ddlc-inform-title {
+  color: var(--ddlc-popup-accent);
+  -webkit-text-stroke: 0;
+}
+
+.ddlc-inform p {
+  margin: 0 0 8px;
+  font: 500 15px / 1.6 var(--ddlc-font-prose);
+}
+
+/* ---------- tables ---------- */
+
+.table-wrap {
+  overflow-x: auto;
+  border: 2px solid var(--ddlc-line);
+  background: var(--ddlc-panel);
+}
+
+.table-wrap table {
+  width: 100%;
+  min-width: 40rem;
+  border-collapse: collapse;
+}
+
+.table-wrap th,
+.table-wrap td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--ddlc-grid);
+  text-align: left;
+  vertical-align: top;
+}
+
+.table-wrap thead th {
+  border-bottom: 2px solid var(--ddlc-line);
+  background: var(--ddlc-code-ground);
+  color: var(--ddlc-muted);
+  font: var(--ddlc-size) / 1.6 var(--ddlc-font-data);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.table-wrap tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+/* An option name in a header cell is one token: a break at its hyphens reads as two words */
+.table-wrap th[scope="row"] code,
+.table-wrap th[scope="col"] code {
+  white-space: nowrap;
+}
+
+.table-wrap caption {
+  padding: 8px 12px;
+  color: var(--ddlc-muted);
+  text-align: left;
+}
+
+.table-wrap td code,
+.table-wrap th code {
+  font-size: var(--ddlc-size);
+}
+
+/* A tool name is the first cell of its row and stays on one line */
+.tool-name {
+  white-space: nowrap;
+}
+
+/* ---------- commands ---------- */
+
+/* A command is one line of a terminal: the window's ground, a prompt and the copy button */
+.cmd {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 16px;
+  padding: 4px 4px 4px 8px;
+  border: 2px solid var(--ddlc-window-border);
+  background: var(--ddlc-window-ground);
+  color: var(--ddlc-window-text);
+  font: var(--ddlc-size) / 1.6 var(--ddlc-font-data);
+  overflow-x: auto;
+}
+
+.cmd::before {
+  content: ">";
+  flex: none;
+  color: var(--ddlc-window-prompt);
+}
+
+/* The window has its own ground, so the report sheet's inline-code chip is lifted here */
+.cmd code {
+  padding: 0;
+  background: none;
+  font: inherit;
+  white-space: nowrap;
+}
+
+.cmd .copy-button {
+  flex: none;
+  margin-left: auto;
+  border-color: var(--ddlc-window-border);
+  background: var(--ddlc-window-bar);
+  color: var(--ddlc-window-title);
+}
+
+pre {
+  max-width: 100%;
+}
+
+/* ---------- the tools page ---------- */
+
+/* A group of tools: its name, the switch that offers it, and the table of its rows */
+.tool-group {
+  margin-bottom: 40px;
+}
+
+.tool-group > h2 {
+  margin-bottom: 4px;
+}
+
+.tool-group > p {
+  margin: 0 0 12px;
+  color: var(--ddlc-muted);
+  font: 500 15px / 1.6 var(--ddlc-font-prose);
+}
+
+.tool-group > p code {
+  font-size: var(--ddlc-size);
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 24px;
+}
+
+.filters .button[aria-pressed="true"] {
+  border-color: var(--ddlc-text);
+  background: var(--ddlc-text);
+  color: var(--ddlc-ground);
+}
+
+/* ---------- documentation ---------- */
+
+.doc-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: calc(var(--ddlc-gap) * 2);
+  padding-top: 32px;
+  padding-bottom: 48px;
+}
+
+@media (max-width: 980px) {
+  .doc-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.doc-nav {
+  align-self: start;
+  padding: 12px 16px;
+  border: 2px solid var(--ddlc-line);
+  background: var(--ddlc-panel);
+}
+
+@media (min-width: 981px) {
+  .doc-nav {
+    position: sticky;
+    top: 84px;
+  }
+}
+
+.doc-nav-title {
+  margin: 8px 0;
+  color: var(--ddlc-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.doc-nav ul {
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.doc-nav a {
+  display: block;
+  padding: 2px 8px;
+  border-left: 4px solid transparent;
+  color: var(--ddlc-text);
+  text-decoration: none;
+}
+
+.doc-nav a:hover {
+  border-left-color: var(--ddlc-accent);
+  color: var(--ddlc-accent);
+}
+
+.doc-nav a[aria-current="page"] {
+  border-left-color: var(--ddlc-accent);
+  background: var(--ddlc-code-ground);
+}
+
+.doc-body {
+  min-width: 0;
+}
+
+.doc-body h1 {
+  margin-bottom: 16px;
+  font-size: 33px;
+  line-height: 1.25;
+}
+
+.doc-body > p {
+  margin: 0 0 12px;
+  color: var(--ddlc-muted);
+  font: 500 16px / 1.65 var(--ddlc-font-prose);
+}
+
+.doc-body h2 {
+  margin-top: 40px;
+  margin-bottom: 10px;
+  font-size: var(--ddlc-size-big);
+}
+
+.doc-body h3 {
+  margin-top: 32px;
+  margin-bottom: 12px;
+}
+
+.doc-body .table-wrap,
+.doc-body .cmd,
+.doc-body pre {
+  margin: 14px 0 28px;
+}
+
+.doc-body ul,
+.doc-body ol {
+  margin: 0 0 16px;
+  padding-left: 20px;
+}
+
+.doc-body li {
+  margin-bottom: 6px;
+  color: var(--ddlc-muted);
+  font: 500 15px / 1.6 var(--ddlc-font-prose);
+}
+
+.doc-body li strong,
+.doc-body p strong {
+  color: var(--ddlc-text);
+}
+
+.doc-body h1 code,
+.doc-body h2 code,
+.doc-body h3 code {
+  line-height: 1.2;
+  vertical-align: 0.06em;
+}
+
+/* The line that says which file owns the subject of a page */
+.canonical {
+  margin: 8px 0 24px;
+  padding: 4px 8px;
+  border-left: 4px solid var(--ddlc-accent);
+  background: var(--ddlc-code-ground);
+  font: var(--ddlc-size) / 1.6 var(--ddlc-font-data);
+}
+
+.canonical a {
+  color: var(--ddlc-link);
+}
+
+.doc-next {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  margin-top: 40px;
+  padding-top: 16px;
+  border-top: 2px solid var(--ddlc-line);
+}
+
+.doc-next a {
+  font-size: var(--ddlc-size);
+}
+
+/* ---------- questions ---------- */
+
+.faq details {
+  border: 2px solid var(--ddlc-line);
+  background: var(--ddlc-panel);
+}
+
+.faq details + details {
+  margin-top: 8px;
+}
+
+.faq summary {
+  padding: 8px 12px;
+  cursor: pointer;
+  font: 500 16px / 1.4 var(--ddlc-font-prose);
+}
+
+.faq summary::marker {
+  color: var(--ddlc-accent);
+}
+
+.faq details[open] summary {
+  border-bottom: 2px solid var(--ddlc-line);
+  color: var(--ddlc-accent);
+}
+
+.faq .answer {
+  padding: 12px;
+  font: 500 15px / 1.6 var(--ddlc-font-prose);
+}
+
+.faq .answer p {
+  margin: 0 0 8px;
+}
+
+.faq .answer p:last-child {
+  margin-bottom: 0;
+}
+
+.faq .answer code {
+  font-size: var(--ddlc-size);
+}
+
+/* ---------- install tabs ---------- */
+
+.tabpanel {
+  min-width: 0;
+  padding-top: 16px;
+  font: 500 15px / 1.6 var(--ddlc-font-prose);
+}
+
+.tabpanel > h3 {
+  margin-bottom: 4px;
+  font-family: var(--ddlc-font-heading);
+  font-weight: 400;
+  font-variation-settings: "wght" 900;
+}
+
+.tabpanel p {
+  margin: 0 0 8px;
+  color: var(--ddlc-muted);
+}
+
+.js .tabpanel {
+  display: none;
+}
+
+.js .tabpanel.is-active {
+  display: block;
+}
+
+.js [data-dialog-open] {
+  display: inline-flex;
+}
+
+[data-dialog-open] {
+  display: none;
+}
+
+/* ---------- the neighbourhood pop-up ---------- */
+
+.minimap {
+  width: min(820px, calc(100vw - 32px));
+}
+
+.minimap p {
+  margin: 0 0 12px;
+  font: 500 15px / 1.6 var(--ddlc-font-prose);
+}
+
+.minimap canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 2px solid var(--ddlc-text);
+  background: var(--ddlc-code-ground);
+  image-rendering: pixelated;
+}
+
+.minimap-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.minimap-foot .status {
+  flex: 1 1 200px;
+  font-size: var(--ddlc-size);
+}
+
+/* A point on the map is a lit cell; its label sits beside it in the data face */
+.minimap-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+  color: var(--ddlc-muted);
+  font-size: var(--ddlc-size);
+}
+
+.minimap-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.minimap-legend i {
+  width: 10px;
+  height: 10px;
+  background: var(--ddlc-accent);
+}
+
+.minimap-legend i.alt {
+  background: var(--ddlc-accent-live);
+}
+
+/* ---------- the footer ---------- */
+
+.site-footer {
+  margin-top: 48px;
+  border-top: 2px solid var(--ddlc-line);
+  padding: 32px 0 24px;
+  background: var(--ddlc-panel);
+}
+
+.footer-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) repeat(auto-fit, minmax(min(100%, 180px), 1fr));
+  gap: 24px var(--ddlc-gap);
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .footer-inner {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.footer-title {
+  margin: 0 0 8px;
+  color: var(--ddlc-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.site-footer ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.site-footer li {
+  margin-bottom: 4px;
+}
+
+.footer-note {
+  margin: 8px 0;
+  color: var(--ddlc-muted);
+}
+
+.footer-credit {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 2px solid var(--ddlc-line);
+  color: var(--ddlc-muted);
+}
+
+.footer-credit p {
+  margin: 0 0 6px;
+  max-width: 90ch;
+}
+
+/* ---------- motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .endpoint-dot,
+  .wave span,
+  .caret {
+    animation: none;
+  }
+
+  .endpoint-card,
+  .quote,
+  .sticker,
+  .num-sticker,
+  .step::before {
+    transform: none;
+  }
+}

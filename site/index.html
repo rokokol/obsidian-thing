@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js" data-ddlc-heading="plain">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-ru="Obsidian Thing — волт Obsidian за эндпоинтом MCP">Obsidian Thing — an Obsidian vault behind an MCP endpoint</title>
+<meta name="description" content="One endpoint and one token for each Obsidian vault: reads without the app, writes that carry a revision and pass your own rules, and search that stays on your machine. MIT" data-ru-content="Один эндпоинт и один токен на каждый волт Obsidian: чтение без приложения, запись с ревизией и твоими правилами, поиск на твоей машине. MIT">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Obsidian Thing — an Obsidian vault behind an MCP endpoint">
+<meta property="og:description" content="Reads without the Obsidian app, writes at a revision, local search. One token for each vault">
+<meta property="og:image" content="https://obsidian-thing.rokokol.art/assets/cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Obsidian Thing: a vault on one endpoint, a token, and a call that returns a revision">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://obsidian-thing.rokokol.art/assets/cover.png">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222222" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="./assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./assets/vendor/ddlc/ddlc-tokens.css">
+<link rel="stylesheet" href="./assets/vendor/ddlc/ddlc-ui.css">
+<link rel="stylesheet" href="./assets/vendor/ddlc/ddlc-report.css">
+<link rel="stylesheet" href="./assets/site.css">
+<script>
+  (function () {
+    try {
+      var q = new URLSearchParams(location.search)
+      var pinned = q.get("theme")
+      var theme = pinned === "light" || pinned === "dark" ? pinned : localStorage.getItem("obsidian-thing-theme")
+      if (pinned === "light" || pinned === "dark") localStorage.setItem("obsidian-thing-theme", pinned)
+      if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme
+      var lang = q.get("lang")
+      var stored = localStorage.getItem("obsidian-thing-lang")
+      if (lang === "ru" || (lang !== "en" && stored === "ru")) document.documentElement.lang = "ru"
+    } catch (e) {}
+  })()
+</script>
+<script type="module" src="./assets/kit.js"></script>
+<script src="./assets/site.js" defer></script>
+</head>
+<body>
+<canvas class="cloud" id="cloud" aria-hidden="true"></canvas>
+<a class="skip" href="#main" data-ru="К содержанию">Skip to content</a>
+<header class="site-bar">
+  <div class="bar wrap bar-row">
+    <a class="brand" href="./index.html" aria-label="Obsidian Thing home" data-ru-aria-label="Obsidian Thing — главная">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>Obsidian Thing</span>
+    </a>
+    <p class="tagline" data-ru="Волт за эндпоинтом MCP">A vault behind an MCP endpoint</p>
+    <nav class="tabs" aria-label="Main" data-ru-aria-label="Основное">
+      <a href="./index.html" aria-current="page" data-ru="Обзор">Overview</a>
+      <a href="./features.html" data-ru="Возможности">Features</a>
+      <a href="./tools.html" data-ru="Инструменты">Tools</a>
+      <a href="./docs/index.html" data-ru="Документация">Docs</a>
+      <a href="./faq.html" data-ru="Вопросы">FAQ</a>
+    </nav>
+    <div class="bar-end">
+      <code class="bar-endpoint" aria-hidden="true">/vaults/notes/mcp</code>
+      <div class="segmented lang-switch" role="group" aria-label="Language" data-ru-aria-label="Язык">
+        <button type="button" data-lang-set="en" aria-pressed="true">EN</button>
+        <button type="button" data-lang-set="ru" aria-pressed="false">RU</button>
+      </div>
+      <button class="icon-button" id="theme" type="button" aria-label="Theme: system" data-ru-aria-label="Тема">
+        <svg class="pixel" viewBox="0 0 8 8" aria-hidden="true"><path id="theme-icon"/></svg>
+      </button>
+      <a class="icon-button" href="https://github.com/rokokol/obsidian-thing" aria-label="Obsidian Thing on GitHub" data-ru-aria-label="Obsidian Thing на GitHub">
+        <span class="icon-github" aria-hidden="true"></span>
+      </a>
+    </div>
+  </div>
+</header>
+<main id="main">
+  <section class="hero">
+    <canvas class="lattice" id="lattice" aria-hidden="true"></canvas>
+    <div class="wrap hero-inner">
+      <div>
+        <span class="kicker" data-ru="MCP Streamable HTTP · токен на волт · MIT">MCP Streamable HTTP · one token per vault · MIT</span>
+        <h1 data-ru="Твой волт. Один эндпоинт. &lt;em&gt;Твои правила.&lt;/em&gt;">Your vault. One endpoint. <em>Your rules.</em></h1>
+        <p class="lead" data-ru="Obsidian Thing отдаёт волт Obsidian по MCP Streamable HTTP. Чтение не требует запущенного приложения, запись несёт ревизию, на которой её построили, а менять файлы разрешают твои правила. Поиск остаётся на твоей машине, пока ты не разрешишь иное">Obsidian Thing serves an Obsidian vault over MCP Streamable HTTP. Reads need no running app, a write carries the revision it was built on, and your own rules decide what may change. Search stays on your machine unless you permit otherwise</p>
+        <div class="actions">
+          <a class="button primary" href="#install" data-ru="Установить сервер &lt;span aria-hidden=&quot;true&quot;&gt;→&lt;/span&gt;">Install the server <span aria-hidden="true">→</span></a>
+          <a class="button" href="./docs/index.html" data-ru="Читать документацию">Read the docs</a>
+        </div>
+        <ul class="chips">
+          <li class="chip" data-ru="Чтение &lt;strong&gt;без Obsidian&lt;/strong&gt;">Reads <strong>without Obsidian</strong></li>
+          <li class="chip" data-ru="Запись &lt;strong&gt;по ревизии&lt;/strong&gt;">Writes <strong>at a revision</strong></li>
+          <li class="chip" data-ru="Индекс &lt;strong&gt;локально&lt;/strong&gt;">Index <strong>on your machine</strong></li>
+          <li class="chip" data-ru="Canvas и Base">Canvas and Base</li>
+          <li class="chip" data-ru="Python 3.11+">Python 3.11+</li>
+          <li class="chip" data-ru="Без аккаунта и телеметрии">No account, no telemetry</li>
+        </ul>
+      </div>
+
+      <div>
+        <div class="endpoint-card">
+          <div class="endpoint-head">
+            <span class="endpoint-state"><span class="endpoint-dot" aria-hidden="true"></span><span data-ru="волт: notes">vault: notes</span></span>
+            <span>127.0.0.1:8765</span>
+          </div>
+          <p class="endpoint-path">/vaults/<b>notes</b>/mcp</p>
+          <div class="endpoint-token"><span>Authorization: Bearer</span><code>•••••• 7f1c</code></div>
+          <ul class="calls">
+            <li><span class="tool-name">obsidian.query</span><span class="tool-ms">14 ms</span></li>
+            <li class="hit">Notes/Search.md § <span class="sub" data-ru="Переиндексация">Reindexing</span><span class="score">0.78</span></li>
+            <li class="hit">Notes/State dir.md § <span class="sub" data-ru="Покрытие">Coverage</span><span class="score">0.64</span></li>
+            <li><span class="tool-name">obsidian.stat</span><span class="tool-ms">1 ms</span></li>
+            <li class="hit">Notes/Search.md <b>4 KiB</b></li>
+          </ul>
+          <div class="meter" aria-hidden="true"><span style="width:92%"></span></div>
+          <div class="cap"><span data-ru="покрытие индекса">index coverage</span><span><b>92</b> %</span></div>
+          <div class="stats">
+            <div class="stat"><div class="n">4 312</div><div class="t" data-ru="заметок в индексе">notes indexed</div></div>
+            <div class="stat"><div class="n">0</div><div class="t" data-ru="байт отправлено">bytes sent</div></div>
+            <div class="stat"><div class="n" data-ru="1">1</div><div class="t" data-ru="токен на волт">token per vault</div></div>
+            <div class="stat"><div class="n">rv 0fdc9f6b</div><div class="t" data-ru="ревизия">revision</div></div>
+          </div>
+          <p class="endpoint-foot" data-ru="allowlist: Notes, AGENTS.md · writable: нет">allowlist: Notes, AGENTS.md · writable: no</p>
+          <button class="button primary" type="button" data-dialog-open="minimap" data-ru="Открыть карту окрестности">Open the neighbourhood map</button>
+        </div>
+        <p class="footnote" data-ru="Карточка — рисунок: ни один запрос не покидает страницу">The card is a drawing: no request leaves this page</p>
+      </div>
+    </div>
+  </section>
+
+  <dialog class="minimap" id="minimap" aria-labelledby="minimap-title">
+    <h2 id="minimap-title" data-ru="Карта окрестности">Neighbourhood map</h2>
+    <p data-ru="Так выглядит ответ obsidian.map: исходная заметка и её ближайшие соседи на двух осях. Координаты здесь нарисованы, страница ничего не запрашивает. Порядок и оценка приходят из векторов, а не из положения на рисунке">This is what <code>obsidian.map</code> answers: the source note and its nearest neighbours on two axes. The coordinates are drawn here, and the page requests nothing. The order and the score come from the vectors, not from the position</p>
+    <canvas id="minimap-canvas" aria-hidden="true"></canvas>
+    <div class="minimap-foot">
+      <p class="status" id="minimap-readout" data-ru="7 файлов · explained 0.34 / 0.21 · ранг из векторов">7 files · explained 0.34 / 0.21 · rank from the vectors</p>
+      <form method="dialog"><button class="button" data-ru="Закрыть">Close</button></form>
+    </div>
+    <div class="minimap-legend">
+      <span><i></i><span data-ru="исходная заметка">source note</span></span>
+      <span><i class="alt"></i><span data-ru="сосед">neighbour</span></span>
+    </div>
+  </dialog>
+
+  <section class="facts">
+    <div class="wrap facts-inner">
+      <div class="fact">
+        <div class="n" data-ru="Без приложения">No app needed</div>
+        <div class="t" data-ru="чтение идёт с диска">reads come from disk</div>
+      </div>
+      <div class="fact">
+        <div class="n" data-ru="Ревизия или ничего">Revision or nothing</div>
+        <div class="t" data-ru="запись называет версию, которую заменяет">a write names the version it replaces</div>
+      </div>
+      <div class="fact">
+        <div class="n" data-ru="Allowlist на волт">Allowlist per vault</div>
+        <div class="t" data-ru="скрытые пути и симлинки закрыты">hidden paths and symlinks refused</div>
+      </div>
+      <div class="fact">
+        <div class="n" data-ru="Поиск у тебя">Search that stays</div>
+        <div class="t" data-ru="текстовый индекс локальный, модель по разрешению">the text index is local, the model is opt-in</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="what">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker" data-ru="Что получает агент">What the agent gets</span>
+        <h2 data-ru="Чтение, запись, поиск и связи — по одному адресу">Reading, writing, search and links, on one address</h2>
+        <p data-ru="Инструменты одного волта не похожи на инструменты другого: сервер показывает клиенту только то, что разрешено в конфигурации этого волта">One vault does not offer the tools of another: the server shows a client only what the configuration of that vault allows</p>
+      </div>
+      <div class="grid grid-2">
+        <a class="card" href="./tools.html#reading">
+          <span class="sticker" data-ru="чтение">reading</span>
+          <h3 data-ru="Файл, ревизия и связи">A file, its revision and its links</h3>
+          <p data-ru="&lt;code&gt;obsidian.read&lt;/code&gt; отдаёт текст и SHA-256 содержимого, &lt;code&gt;obsidian.stat&lt;/code&gt; — размер и ревизию без байтов. Ссылки, обратные ссылки и вложения считает отдельный граф, без Obsidian"><code>obsidian.read</code> returns the text and its SHA-256, and <code>obsidian.stat</code> returns the size and the revision without the bytes. A separate graph counts links, backlinks and attachments, without Obsidian</p>
+          <ul>
+            <li data-ru="Canvas и Base читаются как документы">Canvas and Base read as documents</li>
+            <li data-ru="Разрешение ссылок с якорями и неоднозначностью">Link resolution with anchors and ambiguity</li>
+            <li data-ru="Предел чтения — 1 МиБ UTF-8">A 1 MiB limit on UTF-8 text</li>
+          </ul>
+        </a>
+        <a class="card" href="./docs/safety.html">
+          <span class="sticker alt" data-ru="запись">writing</span>
+          <h3 data-ru="Замена, правка фрагмента, переименование">Replace, edit a fragment, rename</h3>
+          <p data-ru="Запись выключена по умолчанию. Во включаемом волте она идёт атомарной заменой по ревизии, а правила и Python-чекер могут отклонить предложенный текст до того, как он попадёт на диск">Writing is off by default. In a writable vault it is an atomic replacement at a revision, and rules or a Python checker can reject the proposed text before it reaches disk</p>
+          <ul>
+            <li data-ru="&lt;code&gt;obsidian.update&lt;/code&gt; заменяет один точный фрагмент"><code>obsidian.update</code> replaces one exact fragment</li>
+            <li data-ru="Переименование правит видимые ссылки">A rename updates the visible links</li>
+            <li data-ru="Удаление только в личную корзину">Deletion only to a private trash</li>
+          </ul>
+        </a>
+        <a class="card" href="./docs/search.html">
+          <span class="sticker" data-ru="поиск">search</span>
+          <h3 data-ru="Текст, метаданные, векторы">Text, metadata, vectors</h3>
+          <p data-ru="Полнотекстовый поиск работает без модели. &lt;code&gt;obsidian.find&lt;/code&gt; фильтрует по тегам, алиасам, свойствам и имени файла. Эмбеддинги добавляют семантику, соседей и карту окрестности">Full-text search works with no model. <code>obsidian.find</code> filters by tag, alias, property and file name. Embeddings add semantics, neighbours and a map of the neighbourhood</p>
+          <ul>
+            <li data-ru="Индекс и журнал расходов отдельно от волта">Index and cost journal outside the vault</li>
+            <li data-ru="Ollama, LM Studio, OpenRouter или свой эндпоинт">Ollama, LM Studio, OpenRouter or your own endpoint</li>
+            <li data-ru="&lt;code&gt;obsidian.status&lt;/code&gt; показывает покрытие и расходы"><code>obsidian.status</code> reports coverage and cost</li>
+          </ul>
+        </a>
+        <a class="card" href="./tools.html#integrations">
+          <span class="sticker quiet" data-ru="интеграции">integrations</span>
+          <h3 data-ru="То, что живёт только в Obsidian">What lives only in Obsidian</h3>
+          <p data-ru="Структурные правки Canvas и Base, иконки Iconic, карточки FSRS Vocabulary и экспорт Excalidraw в PNG. Каждая интеграция — переключатель на волт, по умолчанию выключена почти каждая">Structural edits of Canvas and Base, Iconic file icons, FSRS Vocabulary cards and Excalidraw export to PNG. Each integration is a switch on a vault, and almost every one is off by default</p>
+          <ul>
+            <li data-ru="Валидация документа до публикации">The document is validated before it is published</li>
+            <li data-ru="Одна неудачная правка оставляет файл как был">One failed change leaves the file as it was</li>
+            <li data-ru="PNG-рендер без приложения">A PNG render without the app</li>
+          </ul>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="skills">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker" data-ru="Скиллы, память и инструкции">Skills, memory, instructions</span>
+        <h2 data-ru="Волт приносит свои правила и свои скиллы">The vault brings its own rules, and its own skills</h2>
+        <p data-ru="Агенту нужны три вещи, которые не являются заметками: правила волта, скиллы, написанные под него, и то, что узнали прошлые сессии. Всё это лежит в скрытых путях, куда не достаёт чтение обычного файла. Сервер отдаёт их по имени — рядом со скиллами, которые агент уже несёт">An agent needs three things that are not notes: the rules of the vault, the skills written for it, and what earlier sessions learned. All three sit in hidden paths, which a plain read never reaches. The server serves them by name, beside the skills the agent already carries</p>
+      </div>
+      <div class="grid grid-2">
+        <div>
+          <ol class="steps">
+            <li class="step">
+              <div>
+                <h3 data-ru="Инструкции идут первыми">Instructions come first</h3>
+                <p data-ru="&lt;code&gt;obsidian.agentsmd&lt;/code&gt; возвращает первый читаемый файл настроенного списка, так что AGENTS.md не прячется за GEMINI.md, а файл вне allowlist не скрывает тот, что внутри"><code>obsidian.agentsmd</code> returns the first readable file of the configured list, so <code>AGENTS.md</code> never hides behind <code>GEMINI.md</code>, and a file outside the allowlist never hides one inside it</p>
+              </div>
+            </li>
+            <li class="step">
+              <div>
+                <h3 data-ru="Скиллы волта читаются по имени">The vault's skills, read by name</h3>
+                <p data-ru="&lt;code&gt;obsidian.skills_list&lt;/code&gt; перечисляет каталог &lt;code&gt;.agents/skills&lt;/code&gt;: имя, описание и путь к SKILL.md. &lt;code&gt;obsidian.skill_read&lt;/code&gt; читает сам скилл и его справочные файлы"><code>obsidian.skills_list</code> lists <code>.agents/skills</code> with each name, description and <code>SKILL.md</code> path. <code>obsidian.skill_read</code> reads the skill and its reference files</p>
+              </div>
+            </li>
+            <li class="step">
+              <div>
+                <h3 data-ru="Память переживает сессию">Memory outlives the session</h3>
+                <p data-ru="&lt;code&gt;obsidian.memory_read&lt;/code&gt; и &lt;code&gt;memory_list&lt;/code&gt; читают заметки в &lt;code&gt;.agents/memory&lt;/code&gt;, а &lt;code&gt;memory_write&lt;/code&gt; пишет заметку и строку о ней в MEMORY.md — но только в волте с включённой записью"><code>obsidian.memory_read</code> and <code>memory_list</code> read the notes in <code>.agents/memory</code>, and <code>memory_write</code> writes a note and its line in <code>MEMORY.md</code>, in a writable vault only</p>
+              </div>
+            </li>
+          </ol>
+        </div>
+        <div>
+          <div class="card">
+            <span class="sticker" data-ru="один волт, три похода">one vault, three calls</span>
+            <h3 data-ru="Что видит агент в начале сессии">What the agent sees at the start of a session</h3>
+            <ul class="calls">
+              <li><span class="tool-name">obsidian.agentsmd</span><span class="tool-ms">2 ms</span></li>
+              <li class="hit">AGENTS.md <span class="sub" data-ru="2,4 КиБ">2.4 KiB</span><span class="score">rv 91ac</span></li>
+              <li><span class="tool-name">obsidian.skills_list</span><span class="tool-ms">3 ms</span></li>
+              <li class="hit">6 <span class="sub" data-ru="скиллов">skills</span><span class="score">.agents/skills</span></li>
+              <li><span class="tool-name">obsidian.skill_read</span><span class="tool-ms">2 ms</span></li>
+              <li class="hit">vault-rules <span class="sub">SKILL.md</span><span class="score">rv 4d02</span></li>
+              <li><span class="tool-name">obsidian.memory_read</span><span class="tool-ms">1 ms</span></li>
+              <li class="hit">weekly-review <span class="sub" data-ru="тип: project">type: project</span><span class="score">rv 7c11</span></li>
+            </ul>
+            <p class="muted" data-ru="Так скилл из волта встаёт рядом со скиллами, которые агент уже несёт: своё загружает среда, правила волта приходят вместе с волтом, и ни те ни другие не ходят через allowlist файлов">So a skill in the vault stands beside the skills the agent already carries: the harness loads its own, the vault's rules arrive with the vault, and neither reaches through the file allowlist</p>
+            <ul class="chips">
+              <li class="chip">AGENTS.md</li>
+              <li class="chip">.agents/skills</li>
+              <li class="chip">.agents/memory</li>
+              <li class="chip" data-ru="карточки FSRS">FSRS cards</li>
+            </ul>
+            <p class="footnote" data-ru="Транскрипт — рисунок">The transcript is a drawing</p>
+          </div>
+          <p class="footnote" data-ru="Подробности: &lt;a href=&quot;https://github.com/rokokol/obsidian-thing/blob/main/docs/agents.md&quot;&gt;docs/agents.md&lt;/a&gt; &lt;span aria-hidden=&quot;true&quot;&gt;↗&lt;/span&gt;">Details in <a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/agents.md">docs/agents.md</a> <span aria-hidden="true">↗</span></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="how">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker" data-ru="Как проходит вызов">How a call runs</span>
+        <h2 data-ru="Четыре шага, каждый проверяемый">Four steps, each one checked</h2>
+        <p data-ru="Сервер не держит сессию: каждый вызов несёт токен и проходит одни и те же проверки">The server holds no session: every call carries its token and passes the same checks</p>
+      </div>
+      <ol class="steps">
+        <li class="step">
+          <div>
+            <h3 data-ru="Клиент называет эндпоинт и токен">The client names the endpoint and the token</h3>
+            <p data-ru="POST /vaults/notes/mcp с Authorization: Bearer. Чужой токен получает 401, незнакомый волт — 404, чужой Host — 421">POST /vaults/notes/mcp with Authorization: Bearer. Another token gets 401, an unknown vault 404, an unlisted Host 421</p>
+          </div>
+        </li>
+        <li class="step">
+          <div>
+            <h3 data-ru="Волт сверяет путь с allowlist">The vault checks the path against the allowlist</h3>
+            <p data-ru="Файл разрешает только себя, каталог — своё поддерево. Скрытый сегмент, симлинк и выход за корень отказаны на любом шаге">A file allows itself alone and a directory allows its subtree. A hidden segment, a symlink and an escape from the root are refused at every step</p>
+          </div>
+        </li>
+        <li class="step">
+          <div>
+            <h3 data-ru="Инструмент делает работу">The tool does the work</h3>
+            <p data-ru="Чтение идёт с диска, поиск — по локальному индексу, запись — во временный файл с проверками до замены">A read comes from disk, a search from the local index, and a write goes to a temporary file with its checks before the replacement</p>
+          </div>
+        </li>
+        <li class="step">
+          <div>
+            <h3 data-ru="Ответ называет ревизию">The answer names the revision</h3>
+            <p data-ru="Новая ревизия — SHA-256 того, что теперь на диске. Следующая запись обязана её назвать, иначе сервер откажет вместо догадки">The new revision is the SHA-256 of what is on disk now. The next write must name it, or the server refuses instead of guessing</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <figure class="quote">
+        <blockquote data-ru="Волт — не папка, которую отдают целиком. Это набор правил о том, что агенту можно прочитать и что изменить">A vault is not a folder to hand over whole. It is a set of rules about what an agent may read, and what it may change</blockquote>
+        <figcaption data-ru="основа проекта">the premise of the project</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="section" id="install">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker" data-ru="Установка">Install</span>
+        <h2 data-ru="Один процесс, один TOML-файл">One process, one TOML file</h2>
+        <p data-ru="Скопируй config.example.toml, назови волт и пути, которые он отдаёт, и положи токен в переменную окружения. Остальное — в руководстве">Copy <code>config.example.toml</code>, name the vault and the paths it serves, and put the token in an environment variable. The rest is in the guide</p>
+      </div>
+
+      <div class="tabs-install" data-tabs>
+        <div class="segmented" role="tablist" aria-label="Install method" data-ru-aria-label="Способ установки">
+          <button type="button" role="tab" id="tab-nix" aria-controls="panel-nix" aria-selected="true">Nix</button>
+          <button type="button" role="tab" id="tab-uv" aria-controls="panel-uv" aria-selected="false">uv</button>
+          <button type="button" role="tab" id="tab-docker" aria-controls="panel-docker" aria-selected="false">Docker</button>
+          <button type="button" role="tab" id="tab-nixos" aria-controls="panel-nixos" aria-selected="false">NixOS</button>
+        </div>
+        <div class="tabpanel is-active" id="panel-nix" role="tabpanel" aria-labelledby="tab-nix">
+          <h3 data-ru="Из флейка">From the flake</h3>
+          <p data-ru="Сборка без обращения к реестру: пакет и образ Docker выходят из одной деривации">A build that never asks a registry: the package and the Docker image come from one derivation</p>
+          <div class="cmd"><code>nix run github:rokokol/obsidian-thing -- --config config.toml</code><button class="copy-button" type="button" data-copy="nix run github:rokokol/obsidian-thing -- --config config.toml" aria-label="Copy command" data-ru-aria-label="Скопировать команду"></button></div>
+        </div>
+        <div class="tabpanel" id="panel-uv" role="tabpanel" aria-labelledby="tab-uv">
+          <h3 data-ru="Из чекаута">From a checkout</h3>
+          <p data-ru="Python 3.11 или новее. Наблюдение за файлами есть только на Linux, на других системах индекс сверяется периодическим обходом">Python 3.11 or newer. The file watcher exists on Linux; other systems reconcile the index by periodic scans</p>
+          <div class="cmd"><code>uv run --locked obsidian-thing --config config.toml</code><button class="copy-button" type="button" data-copy="uv run --locked obsidian-thing --config config.toml" aria-label="Copy command" data-ru-aria-label="Скопировать команду"></button></div>
+        </div>
+        <div class="tabpanel" id="panel-docker" role="tabpanel" aria-labelledby="tab-docker">
+          <h3 data-ru="Образ из того же пакета">An image from the same package</h3>
+          <p data-ru="Образ не требует Nix во время работы. Волт и конфигурация монтируются только для чтения, состояние — отдельным каталогом">The image needs no Nix at runtime. The vault and the configuration mount read-only, and the state is a separate directory</p>
+          <div class="cmd"><code>docker run --rm --read-only --publish 127.0.0.1:8765:8765 --env OBSIDIAN_THING_NOTES_TOKEN --volume "$PWD/config.toml:/config.toml:ro" --volume /srv/notes:/vault:ro obsidian-thing:local --config /config.toml --host 0.0.0.0</code><button class="copy-button" type="button" data-copy="docker run --rm --read-only --publish 127.0.0.1:8765:8765 --env OBSIDIAN_THING_NOTES_TOKEN --volume &quot;$PWD/config.toml:/config.toml:ro&quot; --volume /srv/notes:/vault:ro obsidian-thing:local --config /config.toml --host 0.0.0.0" aria-label="Copy command" data-ru-aria-label="Скопировать команду"></button></div>
+        </div>
+        <div class="tabpanel" id="panel-nixos" role="tabpanel" aria-labelledby="tab-nixos">
+          <h3 data-ru="Модуль NixOS">The NixOS module</h3>
+          <p data-ru="Модуль пишет конфигурацию, создаёт приватные каталоги состояния и запускает службу от непривилегированного пользователя">The module writes the configuration, creates the private state directories and runs the service as an unprivileged user</p>
+          <div class="cmd"><code>obsidian-thing.enable = true;</code><button class="copy-button" type="button" data-copy="obsidian-thing.enable = true;" aria-label="Copy line" data-ru-aria-label="Скопировать строку"></button></div>
+        </div>
+      </div>
+
+      <p class="footnote" data-ru="Подробности: &lt;a href=&quot;./docs/connect.html&quot;&gt;подключение&lt;/a&gt; и &lt;a href=&quot;./docs/connect.html#deployment&quot;&gt;развёртывание&lt;/a&gt;">Details in <a href="./docs/connect.html">connecting a client</a> and <a href="./docs/connect.html#deployment">deployment</a></p>
+    </div>
+  </section>
+
+  <section class="section" id="docs">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker" data-ru="Документация">Documentation</span>
+        <h2 data-ru="Короткий гайд здесь, полный справочник — в репозитории">A short guide here, the full reference in the repository</h2>
+        <p data-ru="Эти страницы отвечают на вопрос «как это работает», а таблицы значений живут в docs/ репозитория, чтобы не разъезжаться">These pages answer how it works. The tables of values live in the repository's <code>docs/</code>, so the two cannot drift apart</p>
+      </div>
+      <div class="grid grid-3">
+        <a class="card" href="./docs/connect.html">
+          <h3 data-ru="Подключить клиент">Connect a client</h3>
+          <p data-ru="Конфигурация, токен, эндпоинт и первый вызов curl">Configuration, token, endpoint and the first curl call</p>
+        </a>
+        <a class="card" href="./docs/safety.html">
+          <h3 data-ru="Что сервер разрешает">What the server allows</h3>
+          <p data-ru="Allowlist, ревизии, правила, чекер и корзина">The allowlist, revisions, rules, the checker and the trash</p>
+        </a>
+        <a class="card" href="./docs/search.html">
+          <h3 data-ru="Поиск и расходы">Search and cost</h3>
+          <p data-ru="Текст, метаданные, векторы, бюджет и журнал вызовов">Text, metadata, vectors, the budget and the call journal</p>
+        </a>
+      </div>
+      <p class="footnote" data-ru="Полный справочник: &lt;a href=&quot;./tools.html&quot;&gt;инструменты&lt;/a&gt; · &lt;a href=&quot;https://github.com/rokokol/obsidian-thing/blob/main/docs/config.md&quot;&gt;конфигурация&lt;/a&gt; · &lt;a href=&quot;https://github.com/rokokol/obsidian-thing/blob/main/docs/deployment.md&quot;&gt;развёртывание&lt;/a&gt; &lt;span aria-hidden=&quot;true&quot;&gt;↗&lt;/span&gt;">Full reference: <a href="./tools.html">tools</a> · <a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/config.md">configuration</a> · <a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/deployment.md">deployment</a> <span aria-hidden="true">↗</span></p>
+    </div>
+  </section>
+
+  <section class="section" id="plugin">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker" data-ru="Плагин">The plugin</span>
+        <h2 data-ru="Тот же индекс, но внутри Obsidian">The same index, inside Obsidian</h2>
+        <p data-ru="Плагин не индексирует волт заново и не редактирует заметки. Он спрашивает сервер и показывает ответ: поиск, соседей, карту и состояние индекса">The plugin keeps no index of its own and edits no notes. It asks the server and shows the answer: search, neighbours, the map and the index status</p>
+      </div>
+      <div class="grid grid-4">
+        <div class="card">
+          <span class="sticker" data-ru="поиск">search</span>
+          <h3 data-ru="Текст и метаданные">Text and metadata</h3>
+          <p data-ru="&lt;code&gt;obsidian.query&lt;/code&gt; для текста, &lt;code&gt;obsidian.find&lt;/code&gt; для тегов, алиасов и свойств"><code>obsidian.query</code> for text, <code>obsidian.find</code> for tags, aliases and properties</p>
+        </div>
+        <div class="card">
+          <span class="sticker" data-ru="соседи">related</span>
+          <h3 data-ru="Похожие заметки">Related notes</h3>
+          <p data-ru="Боковая панель показывает ближайшие заметки к открытой и её секции">The sidebar shows the nearest notes to the open one, or to one of its sections</p>
+        </div>
+        <div class="card">
+          <span class="sticker alt" data-ru="карта">map</span>
+          <h3 data-ru="Карта окрестности">Neighbourhood map</h3>
+          <p data-ru="Те же файлы и те же оценки на двух осях; выбор точки открывает заметку">The same files and scores on two axes, and a point opens its note</p>
+        </div>
+        <div class="card">
+          <span class="sticker quiet" data-ru="статус">status</span>
+          <h3 data-ru="Состояние индекса">Index status</h3>
+          <p data-ru="Покрытие, очередь, профиль модели и расходы по дням">Coverage, the queue, the model profile and the cost by day</p>
+        </div>
+      </div>
+      <p class="footnote" data-ru="Установка плагина: &lt;a href=&quot;./docs/connect.html#plugin&quot;&gt;подключение&lt;/a&gt;">Installing the plugin: <a href="./docs/connect.html#plugin">connecting a client</a></p>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="ddlc-inform">
+        <p class="ddlc-inform-title" data-ru="Всё остаётся у тебя">Nothing leaves your machine</p>
+        <p data-ru="MIT, без аккаунта и без телеметрии. Удалённый провайдер эмбеддингов получает текст только после явного &lt;code&gt;allow_cloud&lt;/code&gt; и только из путей &lt;code&gt;include_paths&lt;/code&gt; — и это видно в &lt;code&gt;obsidian.status&lt;/code&gt;">MIT, with no account and no telemetry. A remote embedding provider receives text only after an explicit <code>allow_cloud</code>, and only from the paths in <code>include_paths</code>, which <code>obsidian.status</code> reports</p>
+      </div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-inner">
+      <div>
+        <a class="brand" href="./index.html" aria-label="Obsidian Thing home" data-ru-aria-label="Obsidian Thing — главная">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span>Obsidian Thing</span>
+        </a>
+        <p class="footer-note" data-ru="Волт Obsidian за эндпоинтом MCP: чтение, запись, поиск и связи">An Obsidian vault behind an MCP endpoint: reading, writing, search and links</p>
+      </div>
+      <div>
+        <p class="footer-title" data-ru="Проект">Project</p>
+        <ul>
+          <li><a href="https://github.com/rokokol/obsidian-thing" data-ru="Исходники">Source</a></li>
+          <li><a href="https://github.com/rokokol/obsidian-thing/releases" data-ru="Релизы">Releases</a></li>
+          <li><a href="https://github.com/rokokol/obsidian-thing/pkgs/container/obsidian-thing" data-ru="Образ">Container</a></li>
+          <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/LICENSE" data-ru="Лицензия MIT">MIT licence</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-title" data-ru="Документация">Docs</p>
+        <ul>
+          <li><a href="./tools.html" data-ru="Инструменты">Tools</a></li>
+          <li><a href="./docs/connect.html" data-ru="Подключение">Connecting</a></li>
+          <li><a href="./docs/safety.html" data-ru="Права и правила">Permissions</a></li>
+          <li><a href="./docs/search.html" data-ru="Поиск">Search</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-title" data-ru="Сайт">Site</p>
+        <ul>
+          <li><a href="./index.html" data-ru="Обзор">Overview</a></li>
+          <li><a href="./features.html" data-ru="Возможности">Features</a></li>
+          <li><a href="./faq.html" data-ru="Вопросы">FAQ</a></li>
+          <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/CHANGELOG.md" data-ru="Изменения">Changelog</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-credit">
+      <p data-ru="Цвета и кит — из &lt;a href=&quot;https://github.com/rokokol/ddlc-themes&quot;&gt;ddlc-themes&lt;/a&gt;, сняты с ddlc.moe через &lt;a href=&quot;https://github.com/rokokol/ddlc-palette&quot;&gt;ddlc-palette&lt;/a&gt;. Шрифты Departure Mono и Mya Nunito — SIL OFL 1.1">Colours and kit from <a href="https://github.com/rokokol/ddlc-themes">ddlc-themes</a>, measured off ddlc.moe through <a href="https://github.com/rokokol/ddlc-palette">ddlc-palette</a>. The faces Departure Mono and Mya Nunito are SIL OFL 1.1</p>
+      <p data-ru="Obsidian — товарный знак Dynalist Inc. Проект с ним не связан. Doki Doki Literature Club — Team Salvato; проект не связан и не одобрен">Obsidian is a trademark of Dynalist Inc. This project is not affiliated with it. Doki Doki Literature Club belongs to Team Salvato, and this project is neither affiliated with nor endorsed by it</p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

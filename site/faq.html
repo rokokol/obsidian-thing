@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en" class="no-js" data-ddlc-heading="plain">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-ru="Вопросы — Obsidian Thing">Questions — Obsidian Thing</title>
+<meta name="description" content="Short answers about running Obsidian Thing: the app, syncing, safety, two agents, tokens, remote providers and platforms" data-ru-content="Короткие ответы про Obsidian Thing: приложение, синхронизация, безопасность, два агента, токены, удалённые провайдеры и платформы">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Questions — Obsidian Thing">
+<meta property="og:description" content="The app, syncing, safety, two agents, tokens and platforms">
+<meta property="og:image" content="https://obsidian-thing.rokokol.art/assets/cover.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Obsidian Thing: a vault on one endpoint, a token, and a call that returns a revision">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://obsidian-thing.rokokol.art/assets/cover.png">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#222222" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="./assets/logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./assets/vendor/ddlc/ddlc-tokens.css">
+<link rel="stylesheet" href="./assets/vendor/ddlc/ddlc-ui.css">
+<link rel="stylesheet" href="./assets/vendor/ddlc/ddlc-report.css">
+<link rel="stylesheet" href="./assets/site.css">
+<script>
+  (function () {
+    try {
+      var q = new URLSearchParams(location.search)
+      var pinned = q.get("theme")
+      var theme = pinned === "light" || pinned === "dark" ? pinned : localStorage.getItem("obsidian-thing-theme")
+      if (pinned === "light" || pinned === "dark") localStorage.setItem("obsidian-thing-theme", pinned)
+      if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme
+      var lang = q.get("lang")
+      var stored = localStorage.getItem("obsidian-thing-lang")
+      if (lang === "ru" || (lang !== "en" && stored === "ru")) document.documentElement.lang = "ru"
+    } catch (e) {}
+  })()
+</script>
+<script type="module" src="./assets/kit.js"></script>
+<script src="./assets/site.js" defer></script>
+</head>
+<body>
+<canvas class="cloud" id="cloud" aria-hidden="true"></canvas>
+<a class="skip" href="#main" data-ru="К содержанию">Skip to content</a>
+<header class="site-bar">
+  <div class="bar wrap bar-row">
+    <a class="brand" href="./index.html" aria-label="Obsidian Thing home" data-ru-aria-label="Obsidian Thing — главная">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span>Obsidian Thing</span>
+    </a>
+    <p class="tagline" data-ru="Волт за эндпоинтом MCP">A vault behind an MCP endpoint</p>
+    <nav class="tabs" aria-label="Main" data-ru-aria-label="Основное">
+      <a href="./index.html" data-ru="Обзор">Overview</a>
+      <a href="./features.html" data-ru="Возможности">Features</a>
+      <a href="./tools.html" data-ru="Инструменты">Tools</a>
+      <a href="./docs/index.html" data-ru="Документация">Docs</a>
+      <a href="./faq.html" aria-current="page" data-ru="Вопросы">FAQ</a>
+    </nav>
+    <div class="bar-end">
+      <code class="bar-endpoint" aria-hidden="true">/vaults/notes/mcp</code>
+      <div class="segmented lang-switch" role="group" aria-label="Language" data-ru-aria-label="Язык">
+        <button type="button" data-lang-set="en" aria-pressed="true">EN</button>
+        <button type="button" data-lang-set="ru" aria-pressed="false">RU</button>
+      </div>
+      <button class="icon-button" id="theme" type="button" aria-label="Theme: system" data-ru-aria-label="Тема">
+        <svg class="pixel" viewBox="0 0 8 8" aria-hidden="true"><path id="theme-icon"/></svg>
+      </button>
+      <a class="icon-button" href="https://github.com/rokokol/obsidian-thing" aria-label="Obsidian Thing on GitHub" data-ru-aria-label="Obsidian Thing на GitHub">
+        <span class="icon-github" aria-hidden="true"></span>
+      </a>
+    </div>
+  </div>
+</header>
+<main id="main">
+  <section class="section">
+    <div class="wrap">
+      <div class="section-head">
+        <span class="kicker" data-ru="Вопросы">Questions</span>
+        <h1 data-ru="Коротко о том, что спрашивают чаще всего">The short answers</h1>
+        <p data-ru="Если ответа нет здесь, он есть в &lt;a href=&quot;./docs/index.html&quot;&gt;гайде&lt;/a&gt; или в &lt;a href=&quot;https://github.com/rokokol/obsidian-thing/issues&quot;&gt;issues&lt;/a&gt;">When an answer is not here, it is in the <a href="./docs/index.html">guide</a> or in the <a href="https://github.com/rokokol/obsidian-thing/issues">issues</a></p>
+      </div>
+      <div class="faq">
+        <details>
+          <summary data-ru="Нужен ли запущенный Obsidian?">Do I need Obsidian running?</summary>
+          <div class="answer">
+            <p data-ru="Нет. Сервер читает каталог волта с диска, и приложение не нужно ни для чтения, ни для записи, ни для поиска">No. The server reads the vault directory from disk, and the app is needed for neither reading nor writing nor search</p>
+          </div>
+        </details>
+        <details>
+          <summary data-ru="Это работает с Obsidian Sync?">Does it work with Obsidian Sync?</summary>
+          <div class="answer">
+            <p data-ru="Так же, как с любой синхронизацией: сервер видит то, что лежит в каталоге. Изменения, пришедшие снаружи, он замечает наблюдением за файлами и периодическим обходом, а на Linux ещё и событиями inotify">The same way it works with any sync: the server sees what the directory holds. An outside change is noticed by the file watcher and by a periodic scan, and on Linux by inotify events as well</p>
+            <p data-ru="Одно исключение — конкурентная запись: ревизия защищает от того, что сервер может увидеть, но не от чужого процесса, который пишет файл в тот же момент">One exception is a concurrent write: a revision protects against what the server can see, not against another process writing the same file at the same moment</p>
+          </div>
+        </details>
+        <details>
+          <summary data-ru="Насколько безопасна запись?">How safe is writing?</summary>
+          <div class="answer">
+            <p data-ru="Запись выключена по умолчанию. Во включаемом волте каждая правка несёт ревизию, заменяет файл атомарно, проходит правила волта и доверенный Python-чекер, а отказ любого из них оставляет файл как был">Writing is off by default. In a writable vault every edit carries a revision, replaces the file atomically, passes the vault rules and a trusted Python checker, and a refusal from any of them leaves the file as it was</p>
+          </div>
+        </details>
+        <details>
+          <summary data-ru="Что будет, если два агента пишут одновременно?">What happens when two agents write at once?</summary>
+          <div class="answer">
+            <p data-ru="Один процесс сериализует правки и сверяет ревизию перед каждой, поэтому второй агент получит отказ и перечитает файл. Два процесса на одном волте так не работают: сверка перестаёт что-либо значить. Запускай один процесс на волт с записью">One process serializes the edits and checks the revision before each one, so the second agent gets a refusal and reads the file again. Two processes on one vault break that: the check stops meaning anything. Run one process for each writable vault</p>
+          </div>
+        </details>
+        <details>
+          <summary data-ru="Куда попадает токен?">Where does the token go?</summary>
+          <div class="answer">
+            <p data-ru="В переменную окружения, имя которой задаёт token_env. В конфигурации лежит только имя. Плагин Obsidian хранит сам токен в своём Secret Storage, а в data.json оставляет идентификатор секрета">Into the environment variable that <code>token_env</code> names. The configuration holds only that name. The Obsidian plugin keeps the token itself in Obsidian's secret storage and leaves only the secret ID in <code>data.json</code></p>
+          </div>
+        </details>
+        <details>
+          <summary data-ru="Заметки уходят на сервер провайдера?">Do my notes reach a provider?</summary>
+          <div class="answer">
+            <p data-ru="Без явного разрешения — нет. Векторный поиск требует провайдера, удалённая отправка — allow_cloud и include_paths, и только после этого текст покидает машину. Текстовый поиск и фильтры по метаданным модели не вызывают вовсе">Not without an explicit permission. Vector search needs a provider, and a remote send needs <code>allow_cloud</code> and <code>include_paths</code>; only then does text leave the machine. Text search and metadata filters never call a model</p>
+          </div>
+        </details>
+        <details>
+          <summary data-ru="Можно ли обойтись без эмбеддингов?">Can I run it without embeddings?</summary>
+          <div class="answer">
+            <p data-ru="Да. Волт с state_dir и enabled = false получает полнотекстовый поиск, фильтры и весь граф ссылок, но не получает related и map, которым нужны векторы">Yes. A vault with <code>state_dir</code> and <code>enabled = false</code> gets full-text search, the filters and the whole link graph, but not <code>related</code> and <code>map</code>, which need vectors</p>
+          </div>
+        </details>
+        <details>
+          <summary data-ru="Работает ли на macOS и Windows?">Does it run on macOS and Windows?</summary>
+          <div class="answer">
+            <p data-ru="Сервер на Python работает везде, но наблюдение за файлами есть только на Linux. На других системах индекс обновляется периодическим обходом, и это единственное отличие">The Python server runs anywhere, but the file watcher exists on Linux only. Other systems reconcile the index by periodic scans, and that is the only difference</p>
+          </div>
+        </details>
+        <details>
+          <summary data-ru="Есть ли мобильное приложение?">Is there a mobile app?</summary>
+          <div class="answer">
+            <p data-ru="Нет и не планируется: это сервер, а клиентом выступает агент или плагин Obsidian на компьютере. Мобильный Obsidian плагин не поддерживает">No, and none is planned: this is a server, and the clients are an agent or the desktop Obsidian plugin. Mobile Obsidian cannot run the plugin</p>
+          </div>
+        </details>
+        <details>
+          <summary data-ru="Что с лицензией?">What is the licence?</summary>
+          <div class="answer">
+            <p data-ru="MIT. Цвета, шрифты и веб-кит этого сайта пришли из ddlc-themes и ddlc-palette, а Obsidian — товарный знак Dynalist Inc., с которым проект не связан">MIT. The colours, the faces and the web kit of this site come from ddlc-themes and ddlc-palette, and Obsidian is a trademark of Dynalist Inc., with which this project is not affiliated</p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="footer-inner">
+      <div>
+        <a class="brand" href="./index.html" aria-label="Obsidian Thing home" data-ru-aria-label="Obsidian Thing — главная">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span>Obsidian Thing</span>
+        </a>
+        <p class="footer-note" data-ru="Волт Obsidian за эндпоинтом MCP: чтение, запись, поиск и связи">An Obsidian vault behind an MCP endpoint: reading, writing, search and links</p>
+      </div>
+      <div>
+        <p class="footer-title" data-ru="Проект">Project</p>
+        <ul>
+          <li><a href="https://github.com/rokokol/obsidian-thing" data-ru="Исходники">Source</a></li>
+          <li><a href="https://github.com/rokokol/obsidian-thing/releases" data-ru="Релизы">Releases</a></li>
+          <li><a href="https://github.com/rokokol/obsidian-thing/pkgs/container/obsidian-thing" data-ru="Образ">Container</a></li>
+          <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/LICENSE" data-ru="Лицензия MIT">MIT licence</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-title" data-ru="Документация">Docs</p>
+        <ul>
+          <li><a href="./tools.html" data-ru="Инструменты">Tools</a></li>
+          <li><a href="./docs/connect.html" data-ru="Подключение">Connecting</a></li>
+          <li><a href="./docs/safety.html" data-ru="Права и правила">Permissions</a></li>
+          <li><a href="./docs/search.html" data-ru="Поиск">Search</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="footer-title" data-ru="Сайт">Site</p>
+        <ul>
+          <li><a href="./index.html" data-ru="Обзор">Overview</a></li>
+          <li><a href="./features.html" data-ru="Возможности">Features</a></li>
+          <li><a href="./faq.html" data-ru="Вопросы">FAQ</a></li>
+          <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/CHANGELOG.md" data-ru="Изменения">Changelog</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-credit">
+      <p data-ru="Цвета и кит — из &lt;a href=&quot;https://github.com/rokokol/ddlc-themes&quot;&gt;ddlc-themes&lt;/a&gt;, сняты с ddlc.moe через &lt;a href=&quot;https://github.com/rokokol/ddlc-palette&quot;&gt;ddlc-palette&lt;/a&gt;. Шрифты Departure Mono и Mya Nunito — SIL OFL 1.1">Colours and kit from <a href="https://github.com/rokokol/ddlc-themes">ddlc-themes</a>, measured off ddlc.moe through <a href="https://github.com/rokokol/ddlc-palette">ddlc-palette</a>. The faces Departure Mono and Mya Nunito are SIL OFL 1.1</p>
+      <p data-ru="Obsidian — товарный знак Dynalist Inc. Проект с ним не связан. Doki Doki Literature Club — Team Salvato; проект не связан и не одобрен">Obsidian is a trademark of Dynalist Inc. This project is not affiliated with it. Doki Doki Literature Club belongs to Team Salvato, and this project is neither affiliated with nor endorsed by it</p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

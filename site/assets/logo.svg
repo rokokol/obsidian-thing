@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" shape-rendering="crispEdges" role="img" aria-label="Obsidian Thing">
+  <!-- The mark is a lattice of notes: four corner nodes, one lit note in the middle, and a
+       two-cell staircase from each node to the centre at 45 % of the same colour. It is drawn
+       on a 16-unit grid of whole cells, so every edge lands on a pixel at 16, 22, 32 and 64 px
+       The two colours are DDLC palette roles: plum (#BB5599) on a light ground, pink (#DD77BB)
+       on a dark one. On the site the mark is a CSS mask instead, so the accent role of the
+       page decides and the site's own theme switch wins over the system. This table is what a
+       standalone use reads: a favicon, a bookmark, a preview -->
+  <style>
+    :root { color: #BB5599 }
+    @media (prefers-color-scheme: dark) { :root { color: #DD77BB } }
+  </style>
+  <g fill="currentColor" fill-opacity="0.45">
+    <rect x="6" y="3" width="2" height="2"/>
+    <rect x="8" y="2" width="2" height="2"/>
+    <rect x="11" y="6" width="2" height="2"/>
+    <rect x="12" y="8" width="2" height="2"/>
+    <rect x="8" y="11" width="2" height="2"/>
+    <rect x="6" y="12" width="2" height="2"/>
+    <rect x="3" y="8" width="2" height="2"/>
+    <rect x="2" y="6" width="2" height="2"/>
+  </g>
+  <g fill="currentColor">
+    <rect x="1" y="1" width="3" height="3"/>
+    <rect x="12" y="1" width="3" height="3"/>
+    <rect x="1" y="12" width="3" height="3"/>
+    <rect x="12" y="12" width="3" height="3"/>
+    <rect x="6" y="6" width="4" height="4"/>
+  </g>
+</svg>

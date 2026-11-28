@@ -54,7 +54,7 @@
       <a href="../features.html" data-ru="Возможности">Features</a>
       <a href="../tools.html" data-ru="Инструменты">Tools</a>
       <a href="./index.html" aria-current="page" data-ru="Документация">Docs</a>
-      <a href="../faq.html" data-ru="Вопросы">FAQ</a>
+      <a href="../faq.html">FAQ</a>
     </nav>
     <div class="bar-end">
       <code class="bar-endpoint" aria-hidden="true">/vaults/notes/mcp</code>
@@ -104,19 +104,19 @@
         <div class="card">
           <span class="num-sticker">02</span>
           <h3 data-ru="Токен">The token</h3>
-          <p data-ru="Authorization: Bearer &lt;token&gt;. Токен берётся из переменной окружения, названной в token_env">Authorization: Bearer &lt;token&gt;. The server reads it from the environment variable that token_env names</p>
+          <p data-ru="Authorization: Bearer &lt;token&gt;. Токен берётся из переменной окружения, названной в &lt;code&gt;token_env&lt;/code&gt;">Authorization: Bearer &lt;token&gt;. The server reads it from the environment variable that token_env names</p>
         </div>
         <div class="card">
           <span class="num-sticker">03</span>
           <h3 data-ru="Доступ">The access</h3>
-          <p data-ru="Список путей в allowed. Файл разрешает себя, каталог — поддерево, а . открывает весь волт">The list of paths in <code>allowed</code>. A file allows itself, a directory allows its subtree, and <code>.</code> opens the whole vault</p>
+          <p data-ru="Список путей в &lt;code&gt;allowed&lt;/code&gt;. Файл разрешает себя, каталог — поддерево, а &lt;code&gt;.&lt;/code&gt; открывает весь волт">The list of paths in <code>allowed</code>. A file allows itself, a directory allows its subtree, and <code>.</code> opens the whole vault</p>
         </div>
       </div>
 
       <h2 data-ru="Что происходит при вызове">What happens on a call</h2>
       <p data-ru="Сервер не держит сессию: Streamable HTTP здесь без состояния, и каждый POST несёт свой токен. Поэтому вызов можно повторить, не восстанавливая рукопожатие">The server holds no session: Streamable HTTP is stateless here, and every POST carries its own token. A call can therefore be repeated without restoring a handshake</p>
       <ol>
-        <li data-ru="Транспорт сверяет Host с allowed_hosts и токен с bearer-ом волта. Ответ на чужое — 401 или 421">The transport compares <code>Host</code> with <code>allowed_hosts</code> and the token with the vault's bearer. A wrong one gets 401 or 421</li>
+        <li data-ru="Транспорт сверяет &lt;code&gt;Host&lt;/code&gt; с &lt;code&gt;allowed_hosts&lt;/code&gt; и токен с bearer-ом волта. Ответ на чужое — 401 или 421">The transport compares <code>Host</code> with <code>allowed_hosts</code> and the token with the vault's bearer. A wrong one gets 401 or 421</li>
         <li data-ru="Инструмент разбирает путь и оставляет только то, что разрешает allowlist и не является скрытым путём или симлинком">The tool resolves the path and keeps only what the allowlist permits and what is neither a hidden path nor a symbolic link</li>
         <li data-ru="Чтение идёт с диска, поиск — по локальному индексу, запись — во временный файл рядом с целью">A read comes from disk, a search from the local index, and a write to a temporary file beside its target</li>
         <li data-ru="Перед заменой файла сервер проверяет ревизию, правила волта и чекер, и только потом переименовывает временный файл">Before it replaces the file the server checks the revision, the vault rules and the checker, and only then renames the temporary file</li>
@@ -190,7 +190,7 @@
         <ul>
           <li><a href="../index.html" data-ru="Обзор">Overview</a></li>
           <li><a href="../features.html" data-ru="Возможности">Features</a></li>
-          <li><a href="../faq.html" data-ru="Вопросы">FAQ</a></li>
+          <li><a href="../faq.html">FAQ</a></li>
           <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/CHANGELOG.md" data-ru="Изменения">Changelog</a></li>
         </ul>
       </div>

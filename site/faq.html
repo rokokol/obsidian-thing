@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title data-ru="Вопросы — Obsidian Thing">Questions — Obsidian Thing</title>
+<title data-ru="FAQ — Obsidian Thing">Questions — Obsidian Thing</title>
 <meta name="description" content="Short answers about running Obsidian Thing: the app, syncing, safety, two agents, tokens, remote providers and platforms" data-ru-content="Короткие ответы про Obsidian Thing: приложение, синхронизация, безопасность, два агента, токены, удалённые провайдеры и платформы">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Questions — Obsidian Thing">
@@ -54,7 +54,7 @@
       <a href="./features.html" data-ru="Возможности">Features</a>
       <a href="./tools.html" data-ru="Инструменты">Tools</a>
       <a href="./docs/index.html" data-ru="Документация">Docs</a>
-      <a href="./faq.html" aria-current="page" data-ru="Вопросы">FAQ</a>
+      <a href="./faq.html" aria-current="page">FAQ</a>
     </nav>
     <div class="bar-end">
       <code class="bar-endpoint" aria-hidden="true">/vaults/notes/mcp</code>
@@ -75,7 +75,7 @@
   <section class="section">
     <div class="wrap">
       <div class="section-head">
-        <span class="kicker" data-ru="Вопросы">Questions</span>
+        <span class="kicker" data-ru="FAQ">Questions</span>
         <h1 data-ru="Коротко о том, что спрашивают чаще всего">The short answers</h1>
         <p data-ru="Если ответа нет здесь, он есть в &lt;a href=&quot;./docs/index.html&quot;&gt;гайде&lt;/a&gt; или в &lt;a href=&quot;https://github.com/rokokol/obsidian-thing/issues&quot;&gt;issues&lt;/a&gt;">When an answer is not here, it is in the <a href="./docs/index.html">guide</a> or in the <a href="https://github.com/rokokol/obsidian-thing/issues">issues</a></p>
       </div>
@@ -108,19 +108,19 @@
         <details>
           <summary data-ru="Куда попадает токен?">Where does the token go?</summary>
           <div class="answer">
-            <p data-ru="В переменную окружения, имя которой задаёт token_env. В конфигурации лежит только имя. Плагин Obsidian хранит сам токен в своём Secret Storage, а в data.json оставляет идентификатор секрета">Into the environment variable that <code>token_env</code> names. The configuration holds only that name. The Obsidian plugin keeps the token itself in Obsidian's secret storage and leaves only the secret ID in <code>data.json</code></p>
+            <p data-ru="В переменную окружения, имя которой задаёт &lt;code&gt;token_env&lt;/code&gt;. В конфигурации лежит только имя. Плагин Obsidian хранит сам токен в своём Secret Storage, а в &lt;code&gt;data.json&lt;/code&gt; оставляет идентификатор секрета">Into the environment variable that <code>token_env</code> names. The configuration holds only that name. The Obsidian plugin keeps the token itself in Obsidian's secret storage and leaves only the secret ID in <code>data.json</code></p>
           </div>
         </details>
         <details>
           <summary data-ru="Заметки уходят на сервер провайдера?">Do my notes reach a provider?</summary>
           <div class="answer">
-            <p data-ru="Без явного разрешения — нет. Векторный поиск требует провайдера, удалённая отправка — allow_cloud и include_paths, и только после этого текст покидает машину. Текстовый поиск и фильтры по метаданным модели не вызывают вовсе">Not without an explicit permission. Vector search needs a provider, and a remote send needs <code>allow_cloud</code> and <code>include_paths</code>; only then does text leave the machine. Text search and metadata filters never call a model</p>
+            <p data-ru="Без явного разрешения — нет. Векторный поиск требует провайдера, удалённая отправка — &lt;code&gt;allow_cloud&lt;/code&gt; и &lt;code&gt;include_paths&lt;/code&gt;, и только после этого текст покидает машину. Текстовый поиск и фильтры по метаданным модели не вызывают вовсе">Not without an explicit permission. Vector search needs a provider, and a remote send needs <code>allow_cloud</code> and <code>include_paths</code>; only then does text leave the machine. Text search and metadata filters never call a model</p>
           </div>
         </details>
         <details>
           <summary data-ru="Можно ли обойтись без эмбеддингов?">Can I run it without embeddings?</summary>
           <div class="answer">
-            <p data-ru="Да. Волт с state_dir и enabled = false получает полнотекстовый поиск, фильтры и весь граф ссылок, но не получает related и map, которым нужны векторы">Yes. A vault with <code>state_dir</code> and <code>enabled = false</code> gets full-text search, the filters and the whole link graph, but not <code>related</code> and <code>map</code>, which need vectors</p>
+            <p data-ru="Да. Волт с &lt;code&gt;state_dir&lt;/code&gt; и &lt;code&gt;enabled = false&lt;/code&gt; получает полнотекстовый поиск, фильтры и весь граф ссылок, но не получает &lt;code&gt;related&lt;/code&gt; и &lt;code&gt;map&lt;/code&gt;, которым нужны векторы">Yes. A vault with <code>state_dir</code> and <code>enabled = false</code> gets full-text search, the filters and the whole link graph, but not <code>related</code> and <code>map</code>, which need vectors</p>
           </div>
         </details>
         <details>
@@ -178,7 +178,7 @@
         <ul>
           <li><a href="./index.html" data-ru="Обзор">Overview</a></li>
           <li><a href="./features.html" data-ru="Возможности">Features</a></li>
-          <li><a href="./faq.html" data-ru="Вопросы">FAQ</a></li>
+          <li><a href="./faq.html">FAQ</a></li>
           <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/CHANGELOG.md" data-ru="Изменения">Changelog</a></li>
         </ul>
       </div>

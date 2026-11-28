@@ -54,7 +54,7 @@
       <a href="../features.html" data-ru="Возможности">Features</a>
       <a href="../tools.html" data-ru="Инструменты">Tools</a>
       <a href="./index.html" aria-current="page" data-ru="Документация">Docs</a>
-      <a href="../faq.html" data-ru="Вопросы">FAQ</a>
+      <a href="../faq.html">FAQ</a>
     </nav>
     <div class="bar-end">
       <code class="bar-endpoint" aria-hidden="true">/vaults/notes/mcp</code>
@@ -105,10 +105,10 @@ token_env = "OBSIDIAN_THING_NOTES_TOKEN"
 [vaults.notes.embeddings]
 enabled = false
 state_dir = "/var/lib/obsidian-thing/notes"</code></pre>
-      <p data-ru=". в allowed открывает весь волт. Перечисли пути поимённо, если агенту нужна только часть. Каталог состояния обязателен для поиска и должен быть приватным">A <code>.</code> in <code>allowed</code> opens the whole vault. Name the paths one by one when the agent needs only a part of it. The state directory is required for search, and it must be private</p>
+      <p data-ru="&lt;code&gt;.&lt;/code&gt; в &lt;code&gt;allowed&lt;/code&gt; открывает весь волт. Перечисли пути поимённо, если агенту нужна только часть. Каталог состояния обязателен для поиска и должен быть приватным">A <code>.</code> in <code>allowed</code> opens the whole vault. Name the paths one by one when the agent needs only a part of it. The state directory is required for search, and it must be private</p>
 
       <h2 id="token" data-ru="2. Задать токен">2. Set the token</h2>
-      <p data-ru="Имя переменной задаёт token_env, а значение — сам токен. Он принимает ASCII-буквы, цифры и символы ._~+/=-">The name comes from <code>token_env</code> and the value is the token itself. It accepts ASCII letters, digits and the characters <code>._~+/=-</code></p>
+      <p data-ru="Имя переменной задаёт &lt;code&gt;token_env&lt;/code&gt;, а значение — сам токен. Он принимает ASCII-буквы, цифры и символы &lt;code&gt;._~+/=-&lt;/code&gt;">The name comes from <code>token_env</code> and the value is the token itself. It accepts ASCII letters, digits and the characters <code>._~+/=-</code></p>
       <div class="cmd"><code>export OBSIDIAN_THING_NOTES_TOKEN=$(openssl rand -hex 32)</code><button class="copy-button" type="button" data-copy="export OBSIDIAN_THING_NOTES_TOKEN=$(openssl rand -hex 32)" aria-label="Copy command" data-ru-aria-label="Скопировать команду"></button></div>
 
       <h2 id="start" data-ru="3. Запустить сервер">3. Start the server</h2>
@@ -148,7 +148,7 @@ state_dir = "/var/lib/obsidian-thing/notes"</code></pre>
             <tr><th scope="row" data-ru="Токен одного волта на адрес другого">One vault's token on another address</th><td><code>401</code></td></tr>
             <tr><th scope="row" data-ru="Идентификатор волта, которого нет в конфигурации">A vault ID the configuration does not name</th><td><code>404</code></td></tr>
             <tr><th scope="row" data-ru="Host вне allowed_hosts">A <code>Host</code> outside <code>allowed_hosts</code></th><td><code>421</code>, <span data-ru="Invalid Host header">Invalid Host header</span></td></tr>
-            <tr><th scope="row" data-ru="obsidian.read файла, который ты поправил руками"><code>obsidian.read</code> of a file you edited by hand</th><td data-ru="Новая ревизия">The new revision</td></tr>
+            <tr><th scope="row" data-ru="&lt;code&gt;obsidian.read&lt;/code&gt; файла, который ты поправил руками"><code>obsidian.read</code> of a file you edited by hand</th><td data-ru="Новая ревизия">The new revision</td></tr>
           </tbody>
         </table>
       </div>
@@ -161,9 +161,9 @@ state_dir = "/var/lib/obsidian-thing/notes"</code></pre>
 
       <h2 id="plugin" data-ru="Плагин Obsidian">The Obsidian plugin</h2>
       <ol>
-        <li data-ru="Скачай manifest.json, main.js и styles.css из одного релиза и положи в .obsidian/plugins/obsidian-thing/, затем включи плагин в Community plugins">Download <code>manifest.json</code>, <code>main.js</code> and <code>styles.css</code> from one release, put them in <code>.obsidian/plugins/obsidian-thing/</code>, then enable the plugin under Community plugins</li>
+        <li data-ru="Скачай &lt;code&gt;manifest.json&lt;/code&gt;, &lt;code&gt;main.js&lt;/code&gt; и &lt;code&gt;styles.css&lt;/code&gt; из одного релиза и положи в &lt;code&gt;.obsidian/plugins/obsidian-thing/&lt;/code&gt;, затем включи плагин в Community plugins">Download <code>manifest.json</code>, <code>main.js</code> and <code>styles.css</code> from one release, put them in <code>.obsidian/plugins/obsidian-thing/</code>, then enable the plugin under Community plugins</li>
         <li data-ru="В настройках укажи полный эндпоинт, включая /vaults/&lt;vault_id&gt;/mcp. Вне доверенной сети — только HTTPS">In the settings, enter the full endpoint, including <code>/vaults/&lt;vault_id&gt;/mcp</code>. Outside a trusted network use HTTPS only</li>
-        <li data-ru="Вставь токен в поле хранения: плагин положит его в Secret Storage Obsidian, а в data.json останется только идентификатор секрета">Paste the token into the storage field: the plugin writes it to Obsidian's secret storage and keeps only the secret ID in <code>data.json</code></li>
+        <li data-ru="Вставь токен в поле хранения: плагин положит его в Secret Storage Obsidian, а в &lt;code&gt;data.json&lt;/code&gt; останется только идентификатор секрета">Paste the token into the storage field: the plugin writes it to Obsidian's secret storage and keeps only the secret ID in <code>data.json</code></li>
         <li data-ru="Нажми Test: плагин покажет список инструментов, которые сервер отдаёт этому волту, и спрячет остальное">Press Test: the plugin shows the tools the server offers this vault, and hides the rest</li>
       </ol>
       <p data-ru="Плагин не индексирует волт и не правит заметки. Поиск, соседи, карта и статус приходят из серверного индекса, а вызов провайдера может сделать только сервер">The plugin keeps no index and edits no notes. Search, neighbours, the map and the status come from the server's index, and only the server can call a provider</p>
@@ -208,7 +208,7 @@ state_dir = "/var/lib/obsidian-thing/notes"</code></pre>
         <ul>
           <li><a href="../index.html" data-ru="Обзор">Overview</a></li>
           <li><a href="../features.html" data-ru="Возможности">Features</a></li>
-          <li><a href="../faq.html" data-ru="Вопросы">FAQ</a></li>
+          <li><a href="../faq.html">FAQ</a></li>
           <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/CHANGELOG.md" data-ru="Изменения">Changelog</a></li>
         </ul>
       </div>

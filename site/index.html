@@ -54,7 +54,7 @@
       <a href="./features.html" data-ru="Возможности">Features</a>
       <a href="./tools.html" data-ru="Инструменты">Tools</a>
       <a href="./docs/index.html" data-ru="Документация">Docs</a>
-      <a href="./faq.html" data-ru="Вопросы">FAQ</a>
+      <a href="./faq.html">FAQ</a>
     </nav>
     <div class="bar-end">
       <code class="bar-endpoint" aria-hidden="true">/vaults/notes/mcp</code>
@@ -126,7 +126,7 @@
 
   <dialog class="minimap" id="minimap" aria-labelledby="minimap-title">
     <h2 id="minimap-title" data-ru="Карта окрестности">Neighbourhood map</h2>
-    <p data-ru="Так выглядит ответ obsidian.map: исходная заметка и её ближайшие соседи на двух осях. Координаты здесь нарисованы, страница ничего не запрашивает. Порядок и оценка приходят из векторов, а не из положения на рисунке">This is what <code>obsidian.map</code> answers: the source note and its nearest neighbours on two axes. The coordinates are drawn here, and the page requests nothing. The order and the score come from the vectors, not from the position</p>
+    <p data-ru="Так выглядит ответ &lt;code&gt;obsidian.map&lt;/code&gt;: исходная заметка и её ближайшие соседи на двух осях. Координаты здесь нарисованы, страница ничего не запрашивает. Порядок и оценка приходят из векторов, а не из положения на рисунке">This is what <code>obsidian.map</code> answers: the source note and its nearest neighbours on two axes. The coordinates are drawn here, and the page requests nothing. The order and the score come from the vectors, not from the position</p>
     <canvas id="minimap-canvas" aria-hidden="true"></canvas>
     <div class="minimap-foot">
       <p class="status" id="minimap-readout" data-ru="7 файлов · explained 0.34 / 0.21 · ранг из векторов">7 files · explained 0.34 / 0.21 · rank from the vectors</p>
@@ -224,19 +224,19 @@
             <li class="step">
               <div>
                 <h3 data-ru="Инструкции идут первыми">Instructions come first</h3>
-                <p data-ru="&lt;code&gt;obsidian.agentsmd&lt;/code&gt; возвращает первый читаемый файл настроенного списка, так что AGENTS.md не прячется за GEMINI.md, а файл вне allowlist не скрывает тот, что внутри"><code>obsidian.agentsmd</code> returns the first readable file of the configured list, so <code>AGENTS.md</code> never hides behind <code>GEMINI.md</code>, and a file outside the allowlist never hides one inside it</p>
+                <p data-ru="&lt;code&gt;obsidian.agentsmd&lt;/code&gt; возвращает первый читаемый файл настроенного списка, так что &lt;code&gt;AGENTS.md&lt;/code&gt; не прячется за &lt;code&gt;GEMINI.md&lt;/code&gt;, а файл вне allowlist не скрывает тот, что внутри"><code>obsidian.agentsmd</code> returns the first readable file of the configured list, so <code>AGENTS.md</code> never hides behind <code>GEMINI.md</code>, and a file outside the allowlist never hides one inside it</p>
               </div>
             </li>
             <li class="step">
               <div>
                 <h3 data-ru="Скиллы волта читаются по имени">The vault's skills, read by name</h3>
-                <p data-ru="&lt;code&gt;obsidian.skills_list&lt;/code&gt; перечисляет каталог &lt;code&gt;.agents/skills&lt;/code&gt;: имя, описание и путь к SKILL.md. &lt;code&gt;obsidian.skill_read&lt;/code&gt; читает сам скилл и его справочные файлы"><code>obsidian.skills_list</code> lists <code>.agents/skills</code> with each name, description and <code>SKILL.md</code> path. <code>obsidian.skill_read</code> reads the skill and its reference files</p>
+                <p data-ru="&lt;code&gt;obsidian.skills_list&lt;/code&gt; перечисляет каталог &lt;code&gt;.agents/skills&lt;/code&gt;: имя, описание и путь к &lt;code&gt;SKILL.md&lt;/code&gt;. &lt;code&gt;obsidian.skill_read&lt;/code&gt; читает сам скилл и его справочные файлы"><code>obsidian.skills_list</code> lists <code>.agents/skills</code> with each name, description and <code>SKILL.md</code> path. <code>obsidian.skill_read</code> reads the skill and its reference files</p>
               </div>
             </li>
             <li class="step">
               <div>
                 <h3 data-ru="Память переживает сессию">Memory outlives the session</h3>
-                <p data-ru="&lt;code&gt;obsidian.memory_read&lt;/code&gt; и &lt;code&gt;memory_list&lt;/code&gt; читают заметки в &lt;code&gt;.agents/memory&lt;/code&gt;, а &lt;code&gt;memory_write&lt;/code&gt; пишет заметку и строку о ней в MEMORY.md — но только в волте с включённой записью"><code>obsidian.memory_read</code> and <code>memory_list</code> read the notes in <code>.agents/memory</code>, and <code>memory_write</code> writes a note and its line in <code>MEMORY.md</code>, in a writable vault only</p>
+                <p data-ru="&lt;code&gt;obsidian.memory_read&lt;/code&gt; и &lt;code&gt;memory_list&lt;/code&gt; читают заметки в &lt;code&gt;.agents/memory&lt;/code&gt;, а &lt;code&gt;memory_write&lt;/code&gt; пишет заметку и строку о ней в &lt;code&gt;MEMORY.md&lt;/code&gt; — но только в волте с включённой записью"><code>obsidian.memory_read</code> and <code>memory_list</code> read the notes in <code>.agents/memory</code>, and <code>memory_write</code> writes a note and its line in <code>MEMORY.md</code>, in a writable vault only</p>
               </div>
             </li>
           </ol>
@@ -456,7 +456,7 @@
         <ul>
           <li><a href="./index.html" data-ru="Обзор">Overview</a></li>
           <li><a href="./features.html" data-ru="Возможности">Features</a></li>
-          <li><a href="./faq.html" data-ru="Вопросы">FAQ</a></li>
+          <li><a href="./faq.html">FAQ</a></li>
           <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/CHANGELOG.md" data-ru="Изменения">Changelog</a></li>
         </ul>
       </div>

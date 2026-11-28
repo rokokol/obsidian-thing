@@ -54,7 +54,7 @@
       <a href="../features.html" data-ru="Возможности">Features</a>
       <a href="../tools.html" data-ru="Инструменты">Tools</a>
       <a href="./index.html" aria-current="page" data-ru="Документация">Docs</a>
-      <a href="../faq.html" data-ru="Вопросы">FAQ</a>
+      <a href="../faq.html">FAQ</a>
     </nav>
     <div class="bar-end">
       <code class="bar-endpoint" aria-hidden="true">/vaults/notes/mcp</code>
@@ -96,23 +96,23 @@
       <p class="canonical" data-ru="Первоисточник: &lt;a href=&quot;https://github.com/rokokol/obsidian-thing/blob/main/docs/config.md&quot;&gt;docs/config.md&lt;/a&gt;, &lt;a href=&quot;https://github.com/rokokol/obsidian-thing/blob/main/docs/vault-rules.md&quot;&gt;docs/vault-rules.md&lt;/a&gt;, &lt;a href=&quot;https://github.com/rokokol/obsidian-thing/blob/main/docs/checker.md&quot;&gt;docs/checker.md&lt;/a&gt;">Canonical source: <a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/config.md">docs/config.md</a>, <a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/vault-rules.md">docs/vault-rules.md</a>, <a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/checker.md">docs/checker.md</a></p>
 
       <h2 data-ru="Allowlist: какие пути существуют для этого токена">The allowlist: which paths exist for this token</h2>
-      <p data-ru="Список allowed — не фильтр результата, а определение того, что вообще видно. Файл разрешает только себя, каталог — своё поддерево, точка открывает весь волт">The <code>allowed</code> list is not a filter on results: it decides what exists at all. A file allows itself alone, a directory allows its subtree, and <code>.</code> opens the whole vault</p>
+      <p data-ru="Список &lt;code&gt;allowed&lt;/code&gt; — не фильтр результата, а определение того, что вообще видно. Файл разрешает только себя, каталог — своё поддерево, точка открывает весь волт">The <code>allowed</code> list is not a filter on results: it decides what exists at all. A file allows itself alone, a directory allows its subtree, and <code>.</code> opens the whole vault</p>
       <pre data-lang="toml"><code>[vaults.notes]
 root = "/srv/notes"
 allowed = ["Notes", "Projects/2026", "AGENTS.md"]</code></pre>
       <ul>
-        <li data-ru="Скрытый сегмент отказан всегда, и .obsidian читается только при read_obsidian = true">A hidden segment is always refused, and <code>.obsidian</code> is read only with <code>read_obsidian = true</code></li>
+        <li data-ru="Скрытый сегмент отказан всегда, и &lt;code&gt;.obsidian&lt;/code&gt; читается только при &lt;code&gt;read_obsidian = true&lt;/code&gt;">A hidden segment is always refused, and <code>.obsidian</code> is read only with <code>read_obsidian = true</code></li>
         <li data-ru="Симлинк отказан: сервер не идёт по ссылке за пределы волта">A symbolic link is refused: the server never follows one out of the vault</li>
-        <li data-ru="Каждый путь из allowed должен существовать при старте, иначе сервер не запустится">Every path in <code>allowed</code> must exist at start, or the server does not start</li>
+        <li data-ru="Каждый путь из &lt;code&gt;allowed&lt;/code&gt; должен существовать при старте, иначе сервер не запустится">Every path in <code>allowed</code> must exist at start, or the server does not start</li>
         <li data-ru="Тот же разбор пути применяется к записи, индексу, графу и поиску">The same path resolution applies to a write, the index, the graph and search</li>
       </ul>
 
       <h2 data-ru="Токен: кто спрашивает">The token: who is asking</h2>
-      <p data-ru="Один токен открывает один волт. Токен читается из переменной окружения, названной в token_env, и не хранится в конфигурации">One token opens one vault. The server reads it from the environment variable that <code>token_env</code> names and never stores it in the configuration</p>
+      <p data-ru="Один токен открывает один волт. Токен читается из переменной окружения, названной в &lt;code&gt;token_env&lt;/code&gt;, и не хранится в конфигурации">One token opens one vault. The server reads it from the environment variable that <code>token_env</code> names and never stores it in the configuration</p>
       <ul>
         <li data-ru="Неверный токен получает 401, идентификатор, которого нет в конфигурации, — 404">A wrong token gets <code>401</code>, and an ID the configuration does not name gets <code>404</code></li>
         <li data-ru="Токен метрик обязан отличаться от токена волта: сервер откажется стартовать с одинаковыми">The metrics token must differ from every vault token, or the server refuses to start</li>
-        <li data-ru="&lt;code&gt;read_obsidian = false&lt;/code&gt; снимает доступ к .obsidian, где могут лежать секреты плагинов"><code>read_obsidian = false</code> removes access to <code>.obsidian</code>, which can hold plugin credentials</li>
+        <li data-ru="&lt;code&gt;read_obsidian = false&lt;/code&gt; снимает доступ к &lt;code&gt;.obsidian&lt;/code&gt;, где могут лежать секреты плагинов"><code>read_obsidian = false</code> removes access to <code>.obsidian</code>, which can hold plugin credentials</li>
       </ul>
 
       <h2 data-ru="Ревизия: на чём построена правка">The revision: what the edit was built on</h2>
@@ -139,7 +139,7 @@ allowed = ["Notes", "Projects/2026", "AGENTS.md"]</code></pre>
       <h2 data-ru="Корзина: что значит «удалено»">The trash: what a deletion leaves</h2>
       <p data-ru="&lt;code&gt;trash_dir&lt;/code&gt; — приватный каталог вне волтов, на том же монтировании, чтобы перемещение не пересекало файловую систему"><code>trash_dir</code> is a private directory outside every vault, on the same mount, so the move never crosses a file system</p>
       <ul>
-        <li data-ru="Сервер создаёт &lt;trash_dir&gt;/&lt;trash_id&gt;/file и рядом path с исходным путём относительно волта">The server creates <code>&lt;trash_dir&gt;/&lt;trash_id&gt;/file</code> and, beside it, <code>path</code> with the original vault-relative path</li>
+        <li data-ru="Сервер создаёт &lt;code&gt;&amp;lt;trash_dir&amp;gt;/&amp;lt;trash_id&amp;gt;/file&lt;/code&gt; и рядом &lt;code&gt;path&lt;/code&gt; с исходным путём относительно волта">The server creates <code>&lt;trash_dir&gt;/&lt;trash_id&gt;/file</code> and, beside it, <code>path</code> with the original vault-relative path</li>
         <li data-ru="Восстановление — вернуть file на место, не перезаписывая существующий файл">Restoring means moving <code>file</code> back without overwriting an existing file</li>
         <li data-ru="Сервер корзину не чистит: когда её освобождать, решает владелец">The server never purges the trash: the owner decides when to empty it</li>
         <li data-ru="Путь, названный в allowlist прямо, удалить нельзя: серверу он нужен при старте">A path named directly in the allowlist cannot be deleted, because the server needs it at start</li>
@@ -150,7 +150,7 @@ allowed = ["Notes", "Projects/2026", "AGENTS.md"]</code></pre>
       <ul>
         <li data-ru="Кавычки, точка в конце, inline-теги, callout-маркеры, формулы в заголовках, ссылки и переносы — по одному переключателю каждый">Quotes, a final period, inline tags, callout markers, formulas in headings, links and hard wraps, each behind its own switch</li>
         <li data-ru="Canvas и Base проверяются структурно при каждом включённом интеграции">Canvas and Base are checked structurally whenever their integration is on</li>
-        <li data-ru="Ответ несёт не больше десяти предупреждений, пока не передан all_warnings = true">The reply carries at most ten warnings unless <code>all_warnings = true</code> is passed</li>
+        <li data-ru="Ответ несёт не больше десяти предупреждений, пока не передан &lt;code&gt;all_warnings = true&lt;/code&gt;">The reply carries at most ten warnings unless <code>all_warnings = true</code> is passed</li>
       </ul>
 
       <h2 data-ru="Чекер: своя проверка перед записью">The checker: your own check before the write</h2>
@@ -162,7 +162,7 @@ allowed = ["Notes", "Projects/2026", "AGENTS.md"]</code></pre>
       </ul>
 
       <h2 data-ru="Интеграции: что ещё нужно включить">Integrations: what else a switch needs</h2>
-      <p data-ru="Интеграция, которой нужен доступ к .obsidian или запись, отказывает на чтении или на волте без writable — сервер не запустится с такой комбинацией">An integration that needs <code>.obsidian</code> access or a write refuses on a read-only vault, and the server does not start with that combination</p>
+      <p data-ru="Интеграция, которой нужен доступ к &lt;code&gt;.obsidian&lt;/code&gt; или запись, отказывает на чтении или на волте без &lt;code&gt;writable&lt;/code&gt; — сервер не запустится с такой комбинацией">An integration that needs <code>.obsidian</code> access or a write refuses on a read-only vault, and the server does not start with that combination</p>
 
       <div class="doc-next">
         <a class="button" href="./search.html" data-ru="Дальше: поиск и расходы →">Next: search and cost <span aria-hidden="true">→</span></a>
@@ -204,7 +204,7 @@ allowed = ["Notes", "Projects/2026", "AGENTS.md"]</code></pre>
         <ul>
           <li><a href="../index.html" data-ru="Обзор">Overview</a></li>
           <li><a href="../features.html" data-ru="Возможности">Features</a></li>
-          <li><a href="../faq.html" data-ru="Вопросы">FAQ</a></li>
+          <li><a href="../faq.html">FAQ</a></li>
           <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/CHANGELOG.md" data-ru="Изменения">Changelog</a></li>
         </ul>
       </div>

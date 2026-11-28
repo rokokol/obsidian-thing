@@ -54,7 +54,7 @@
       <a href="./features.html" aria-current="page" data-ru="Возможности">Features</a>
       <a href="./tools.html" data-ru="Инструменты">Tools</a>
       <a href="./docs/index.html" data-ru="Документация">Docs</a>
-      <a href="./faq.html" data-ru="Вопросы">FAQ</a>
+      <a href="./faq.html">FAQ</a>
     </nav>
     <div class="bar-end">
       <code class="bar-endpoint" aria-hidden="true">/vaults/notes/mcp</code>
@@ -91,15 +91,15 @@
       <div class="grid grid-3">
         <div class="card">
           <h3 data-ru="Файл с ревизией">A file with its revision</h3>
-          <p data-ru="obsidian.read отдаёт путь, содержимое и SHA-256 байтов. obsidian.stat отдаёт размер и ревизию, не передавая мегабайты текста"><code>obsidian.read</code> returns the path, the content and the SHA-256 of the bytes. <code>obsidian.stat</code> returns the size and the revision without moving text</p>
+          <p data-ru="&lt;code&gt;obsidian.read&lt;/code&gt; отдаёт путь, содержимое и SHA-256 байтов. &lt;code&gt;obsidian.stat&lt;/code&gt; отдаёт размер и ревизию, не передавая мегабайты текста"><code>obsidian.read</code> returns the path, the content and the SHA-256 of the bytes. <code>obsidian.stat</code> returns the size and the revision without moving text</p>
         </div>
         <div class="card">
           <h3 data-ru="Ссылки в обе стороны">Links, both ways</h3>
-          <p data-ru="obsidian.links_out перечисляет ссылки заметки, Canvas или Base с разрешением каждой, obsidian.links_in — что указывает на файл"><code>obsidian.links_out</code> lists the links of a note, Canvas or Base with each resolution, and <code>obsidian.links_in</code> lists what points at a file</p>
+          <p data-ru="&lt;code&gt;obsidian.links_out&lt;/code&gt; перечисляет ссылки заметки, Canvas или Base с разрешением каждой, &lt;code&gt;obsidian.links_in&lt;/code&gt; — что указывает на файл"><code>obsidian.links_out</code> lists the links of a note, Canvas or Base with each resolution, and <code>obsidian.links_in</code> lists what points at a file</p>
         </div>
         <div class="card">
           <h3 data-ru="Вложения без байтов">Attachments without bytes</h3>
-          <p data-ru="obsidian.media называет вложения, их тип и размер и не возвращает сами файлы"><code>obsidian.media</code> names the attachments, their type and their size, and returns no file bytes</p>
+          <p data-ru="&lt;code&gt;obsidian.media&lt;/code&gt; называет вложения, их тип и размер и не возвращает сами файлы"><code>obsidian.media</code> names the attachments, their type and their size, and returns no file bytes</p>
         </div>
       </div>
       <div class="table-wrap spaced">
@@ -138,7 +138,7 @@
         <div class="card">
           <span class="sticker alt" data-ru="фрагмент">fragment</span>
           <h3 data-ru="Одно точное совпадение">One exact match</h3>
-          <p data-ru="obsidian.update заменяет old на new там, где old встречается ровно один раз. Два совпадения, в том числе перекрывающиеся, отказывают"><code>obsidian.update</code> replaces <code>old</code> with <code>new</code> where <code>old</code> occurs exactly once. Two matches, overlapping ones included, refuse the edit</p>
+          <p data-ru="&lt;code&gt;obsidian.update&lt;/code&gt; заменяет &lt;code&gt;old&lt;/code&gt; на &lt;code&gt;new&lt;/code&gt; там, где &lt;code&gt;old&lt;/code&gt; встречается ровно один раз. Два совпадения, в том числе перекрывающиеся, отказывают"><code>obsidian.update</code> replaces <code>old</code> with <code>new</code> where <code>old</code> occurs exactly once. Two matches, overlapping ones included, refuse the edit</p>
         </div>
         <div class="card">
           <span class="sticker quiet" data-ru="переименование">rename</span>
@@ -202,17 +202,17 @@
         <div class="card">
           <span class="sticker" data-ru="текст">text</span>
           <h3 data-ru="Ранжирование без провайдера">Ranking with no provider</h3>
-          <p data-ru="obsidian.query ищет по словам через FTS5 и не требует модели. Подчёркивания остаются внутри слова, поэтому section_chunks находится"><code>obsidian.query</code> searches words through FTS5 and needs no model. Underscores stay inside a word, so <code>section_chunks</code> is found</p>
+          <p data-ru="&lt;code&gt;obsidian.query&lt;/code&gt; ищет по словам через FTS5 и не требует модели. Подчёркивания остаются внутри слова, поэтому &lt;code&gt;section_chunks&lt;/code&gt; находится"><code>obsidian.query</code> searches words through FTS5 and needs no model. Underscores stay inside a word, so <code>section_chunks</code> is found</p>
         </div>
         <div class="card">
           <span class="sticker alt" data-ru="метаданные">metadata</span>
           <h3 data-ru="Фильтры по свойствам">Filters on properties</h3>
-          <p data-ru="obsidian.find фильтрует по тегу, алиасу, свойству и регулярному выражению имени файла, без эмбеддингов. Тег совпадает и по потомкам"><code>obsidian.find</code> filters by tag, alias, property and a regular expression on the file name, with no embeddings. A tag matches its descendants</p>
+          <p data-ru="&lt;code&gt;obsidian.find&lt;/code&gt; фильтрует по тегу, алиасу, свойству и регулярному выражению имени файла, без эмбеддингов. Тег совпадает и по потомкам"><code>obsidian.find</code> filters by tag, alias, property and a regular expression on the file name, with no embeddings. A tag matches its descendants</p>
         </div>
         <div class="card">
           <span class="sticker quiet" data-ru="векторы">vectors</span>
           <h3 data-ru="Соседи и карта">Neighbours and a map</h3>
-          <p data-ru="obsidian.related находит ближайшие заметки к файлу или его секции, obsidian.map рисует ту же окрестность на двух осях. Ранг считают векторы, а не координаты"><code>obsidian.related</code> finds the nearest notes to a file or one of its sections, and <code>obsidian.map</code> draws the same neighbourhood on two axes. The vectors rank, the coordinates do not</p>
+          <p data-ru="&lt;code&gt;obsidian.related&lt;/code&gt; находит ближайшие заметки к файлу или его секции, &lt;code&gt;obsidian.map&lt;/code&gt; рисует ту же окрестность на двух осях. Ранг считают векторы, а не координаты"><code>obsidian.related</code> finds the nearest notes to a file or one of its sections, and <code>obsidian.map</code> draws the same neighbourhood on two axes. The vectors rank, the coordinates do not</p>
         </div>
       </div>
       <p class="footnote" data-ru="Провайдеры, вложения, бюджет и журнал: &lt;a href=&quot;./docs/search.html&quot;&gt;поиск и расходы&lt;/a&gt;">Providers, attachments, the budget and the journal: <a href="./docs/search.html">search and cost</a></p>
@@ -259,17 +259,17 @@
         <div class="card">
           <span class="num-sticker">01</span>
           <h3 data-ru="Инструкции по имени">Instructions by name</h3>
-          <p data-ru="obsidian.agentsmd возвращает первый читаемый файл списка instructions, по умолчанию AGENTS.md, GEMINI.md, CLAUDE.md. Файл вне allowlist пропускается и не скрывает следующий"><code>obsidian.agentsmd</code> returns the first readable file of <code>instructions</code>, by default <code>AGENTS.md</code>, <code>GEMINI.md</code>, <code>CLAUDE.md</code>. A file outside the allowlist is skipped and never hides the next one</p>
+          <p data-ru="&lt;code&gt;obsidian.agentsmd&lt;/code&gt; возвращает первый читаемый файл списка &lt;code&gt;instructions&lt;/code&gt;, по умолчанию &lt;code&gt;AGENTS.md&lt;/code&gt;, &lt;code&gt;GEMINI.md&lt;/code&gt;, &lt;code&gt;CLAUDE.md&lt;/code&gt;. Файл вне allowlist пропускается и не скрывает следующий"><code>obsidian.agentsmd</code> returns the first readable file of <code>instructions</code>, by default <code>AGENTS.md</code>, <code>GEMINI.md</code>, <code>CLAUDE.md</code>. A file outside the allowlist is skipped and never hides the next one</p>
         </div>
         <div class="card">
           <span class="num-sticker">02</span>
           <h3 data-ru="Скиллы рядом с чужими">Skills beside the agent's own</h3>
-          <p data-ru="obsidian.skills_list читает .agents/skills, obsidian.skill_read открывает SKILL.md и справочные файлы внутри каталога скилла. Скиллы среды и скиллы волта не мешают друг другу"><code>obsidian.skills_list</code> reads <code>.agents/skills</code>, and <code>obsidian.skill_read</code> opens <code>SKILL.md</code> and the reference files inside the skill directory. The harness skills and the vault skills never collide</p>
+          <p data-ru="&lt;code&gt;obsidian.skills_list&lt;/code&gt; читает &lt;code&gt;.agents/skills&lt;/code&gt;, &lt;code&gt;obsidian.skill_read&lt;/code&gt; открывает &lt;code&gt;SKILL.md&lt;/code&gt; и справочные файлы внутри каталога скилла. Скиллы среды и скиллы волта не мешают друг другу"><code>obsidian.skills_list</code> reads <code>.agents/skills</code>, and <code>obsidian.skill_read</code> opens <code>SKILL.md</code> and the reference files inside the skill directory. The harness skills and the vault skills never collide</p>
         </div>
         <div class="card">
           <span class="num-sticker">03</span>
           <h3 data-ru="Память, пережившая сессию">Memory that outlives the session</h3>
-          <p data-ru="Заметка в .agents/memory с описанием во frontmatter попадает в MEMORY.md одной строкой. Писать может только волт с включённой записью">A note in <code>.agents/memory</code> with a description in its frontmatter takes one line in <code>MEMORY.md</code>. Only a writable vault can write one</p>
+          <p data-ru="Заметка в &lt;code&gt;.agents/memory&lt;/code&gt; с описанием во frontmatter попадает в &lt;code&gt;MEMORY.md&lt;/code&gt; одной строкой. Писать может только волт с включённой записью">A note in <code>.agents/memory</code> with a description in its frontmatter takes one line in <code>MEMORY.md</code>. Only a writable vault can write one</p>
         </div>
       </div>
     </div>
@@ -296,7 +296,7 @@
           <p data-ru="Покрытие индекса, очередь, профиль модели и расходы по дням, с разделением подтверждённой цены и оценки">Index coverage, the queue, the model profile and the cost by day, with a confirmed price kept apart from an estimate</p>
         </div>
       </div>
-      <p class="footnote" data-ru="Токен хранится в Secret Storage Obsidian, а не в data.json. См. &lt;a href=&quot;./docs/connect.html#plugin&quot;&gt;как подключить&lt;/a&gt;">The token lives in Obsidian's secret storage, not in <code>data.json</code>. See <a href="./docs/connect.html#plugin">how to connect it</a></p>
+      <p class="footnote" data-ru="Токен хранится в Secret Storage Obsidian, а не в &lt;code&gt;data.json&lt;/code&gt;. См. &lt;a href=&quot;./docs/connect.html#plugin&quot;&gt;как подключить&lt;/a&gt;">The token lives in Obsidian's secret storage, not in <code>data.json</code>. See <a href="./docs/connect.html#plugin">how to connect it</a></p>
     </div>
   </section>
 </main>
@@ -333,7 +333,7 @@
         <ul>
           <li><a href="./index.html" data-ru="Обзор">Overview</a></li>
           <li><a href="./features.html" data-ru="Возможности">Features</a></li>
-          <li><a href="./faq.html" data-ru="Вопросы">FAQ</a></li>
+          <li><a href="./faq.html">FAQ</a></li>
           <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/CHANGELOG.md" data-ru="Изменения">Changelog</a></li>
         </ul>
       </div>

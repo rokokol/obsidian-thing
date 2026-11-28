@@ -766,18 +766,59 @@ a.card:hover h3 {
   margin: 32px auto 0;
 }
 
-/* The pop-up title is white letters in a plum outline in the report sheet. Its island is pale
-   in both variants here, so the white fill leaves the outline alone and the words thin out.
-   The pop-up's own accent role is dark in both variants and keeps the title readable on that
-   ground */
+/* The pop-up title is the report sheet's own: white letters in a 2 px plum outline, at the
+   kit's big size. Without the size and the stroke it falls back to 1.25em of the pixel root
+   and reads as flat small print, so both lines stay */
 .ddlc-inform-title {
-  color: var(--ddlc-popup-accent);
-  -webkit-text-stroke: 0;
+  font-size: var(--ddlc-size-big);
+  -webkit-text-stroke: 2px var(--ddlc-plum);
 }
 
 .ddlc-inform p {
   margin: 0 0 8px;
   font: 500 15px / 1.6 var(--ddlc-font-prose);
+}
+
+/* ---------- callouts ---------- */
+
+/* A note set aside from the prose: a framed box, a taped label, and a warning role for a
+   box that says what goes wrong */
+.callout {
+  margin: var(--ddlc-gap) 0 28px;
+  padding: 12px 16px 16px;
+  border: 2px solid var(--ddlc-line);
+  background: var(--ddlc-panel);
+  box-shadow: 6px 6px 0 var(--ddlc-line);
+}
+
+.callout-title {
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 2px 8px;
+  border: 2px solid var(--ddlc-text);
+  background: var(--ddlc-accent);
+  color: var(--ddlc-on-accent);
+  font: var(--ddlc-size) / 1.6 var(--ddlc-font-data);
+  transform: rotate(-1deg);
+}
+
+.callout p {
+  margin: 0;
+  font: 500 15px / 1.6 var(--ddlc-font-prose);
+}
+
+/* A name in a note is one token: a token broken across two lines reads as two names */
+.callout code {
+  white-space: nowrap;
+}
+
+.callout.warn {
+  border-color: var(--ddlc-kind-warning);
+  box-shadow: 6px 6px 0 var(--ddlc-kind-warning);
+}
+
+.callout.warn .callout-title {
+  background: var(--ddlc-kind-warning);
 }
 
 /* ---------- tables ---------- */

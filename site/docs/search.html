@@ -54,7 +54,7 @@
       <a href="../features.html" data-ru="Возможности">Features</a>
       <a href="../tools.html" data-ru="Инструменты">Tools</a>
       <a href="./index.html" aria-current="page" data-ru="Документация">Docs</a>
-      <a href="../faq.html" data-ru="Вопросы">FAQ</a>
+      <a href="../faq.html">FAQ</a>
     </nav>
     <div class="bar-end">
       <code class="bar-endpoint" aria-hidden="true">/vaults/notes/mcp</code>
@@ -104,14 +104,14 @@
       </ul>
 
       <h2 data-ru="Текст без модели">Text without a model</h2>
-      <p data-ru="&lt;code&gt;obsidian.query&lt;/code&gt; ищет по словам через FTS5: подчёркивания остаются внутри слова, поэтому section_chunks находится, а русские слова не сводятся к основе"><code>obsidian.query</code> searches words through FTS5: underscores stay inside a token, so <code>section_chunks</code> is found, and it does not reduce Russian words to their base form</p>
+      <p data-ru="&lt;code&gt;obsidian.query&lt;/code&gt; ищет по словам через FTS5: подчёркивания остаются внутри слова, поэтому &lt;code&gt;section_chunks&lt;/code&gt; находится, а русские слова не сводятся к основе"><code>obsidian.query</code> searches words through FTS5: underscores stay inside a token, so <code>section_chunks</code> is found, and it does not reduce Russian words to their base form</p>
       <p data-ru="Результат — один на файл, с секцией и диапазоном строк. Оценка — ранг, а не косинус: текст и векторы складываются через reciprocal rank fusion">The result is one entry per file, with its section and line range. The score is a rank, not a cosine: text and vectors combine through reciprocal rank fusion</p>
 
       <h2 data-ru="Метаданные без эмбеддингов">Metadata without embeddings</h2>
       <p data-ru="&lt;code&gt;obsidian.find&lt;/code&gt; фильтрует проиндексированные заметки по тегам, алиасам, свойствам и имени файла, и не обращается к модели"><code>obsidian.find</code> filters the indexed notes by tag, alias, property and file name, and never calls a model</p>
       <ul>
         <li data-ru="Тег совпадает и по потомкам: project находит project/obsidian, но не projects">A tag matches its descendants: <code>project</code> finds <code>project/obsidian</code>, but not <code>projects</code></li>
-        <li data-ru="Нулевое значение свойства проверяет только наличие: null находит заметки с этим свойством">A null value checks presence alone: <code>null</code> finds the notes that carry the property</li>
+        <li data-ru="Нулевое значение свойства проверяет только наличие: &lt;code&gt;null&lt;/code&gt; находит заметки с этим свойством">A null value checks presence alone: <code>null</code> finds the notes that carry the property</li>
         <li data-ru="&lt;code&gt;filename_regex&lt;/code&gt; ищет по имени с расширением, без каталогов, и подчиняется лимиту времени"><code>filename_regex</code> matches the file name with its extension, without folders, under a time limit</li>
       </ul>
 
@@ -137,7 +137,7 @@
       <p data-ru="HTTP разрешён только на loopback, остальное требует HTTPS, и сервер не следует за перенаправлением. Векторы разделены по профилю: провайдер, адрес, модель, маршрут и размерность">HTTP is allowed on loopback only, everything else needs HTTPS, and the server follows no redirect. Vectors are separated by a profile: the provider, the address, the model, the route and the dimensions</p>
 
       <h2 data-ru="Вложения">Attachments</h2>
-      <p data-ru="По умолчанию индексируется только текст. Картинки, PDF, аудио и видео появляются в allowed_mime_types по одному, и только маршрут Gemini через Vertex умеет их принимать">Only text is indexed by default. Images, PDF, audio and video join <code>allowed_mime_types</code> one type at a time, and only a Gemini route through Vertex accepts them</p>
+      <p data-ru="По умолчанию индексируется только текст. Картинки, PDF, аудио и видео появляются в &lt;code&gt;allowed_mime_types&lt;/code&gt; по одному, и только маршрут Gemini через Vertex умеет их принимать">Only text is indexed by default. Images, PDF, audio and video join <code>allowed_mime_types</code> one type at a time, and only a Gemini route through Vertex accepts them</p>
 
       <h2 data-ru="Разрешение на отправку">Permission to send</h2>
       <p data-ru="&lt;code&gt;allow_cloud&lt;/code&gt; по умолчанию выключен, и удалённый провайдер молчит, пока не названы &lt;code&gt;include_paths&lt;/code&gt; — то есть пока не сказано, какие пути вообще могут уйти"><code>allow_cloud</code> is off by default, and a remote provider stays silent until <code>include_paths</code> names what may leave the machine at all</p>
@@ -169,13 +169,13 @@
 
       <h2 data-ru="Что не попадает в индекс">What stays out of the index</h2>
       <ul>
-        <li data-ru="Шаблоны &lt;code&gt;indexing.exclude&lt;/code&gt; и, по желанию, .gitignore волта">The patterns of <code>indexing.exclude</code> and, on request, the vault's <code>.gitignore</code></li>
+        <li data-ru="Шаблоны &lt;code&gt;indexing.exclude&lt;/code&gt; и, по желанию, &lt;code&gt;.gitignore&lt;/code&gt; волта">The patterns of <code>indexing.exclude</code> and, on request, the vault's <code>.gitignore</code></li>
         <li data-ru="Скрытые пути и симлинки — всегда">Hidden paths and symbolic links, always</li>
         <li data-ru="Рисунки Excalidraw и словари FSRS Vocabulary — даже при включённых интеграциях">Excalidraw drawings and FSRS Vocabulary dictionaries, even with their integrations on</li>
       </ul>
 
       <h2 data-ru="Карта в плагине">The map in the plugin</h2>
-      <p data-ru="&lt;code&gt;obsidian.map&lt;/code&gt; прячется от всех клиентов, кроме плагина: сервер требует заголовок X-Obsidian-Thing-Client: plugin. Заголовок выбирает интерфейс, но не заменяет токен"><code>obsidian.map</code> hides from every client except the plugin: the server requires the header <code>X-Obsidian-Thing-Client: plugin</code>. The header selects an interface and never replaces the token</p>
+      <p data-ru="&lt;code&gt;obsidian.map&lt;/code&gt; прячется от всех клиентов, кроме плагина: сервер требует заголовок &lt;code&gt;X-Obsidian-Thing-Client: plugin&lt;/code&gt;. Заголовок выбирает интерфейс, но не заменяет токен"><code>obsidian.map</code> hides from every client except the plugin: the server requires the header <code>X-Obsidian-Thing-Client: plugin</code>. The header selects an interface and never replaces the token</p>
 
       <div class="doc-next">
         <a class="button" href="../tools.html" data-ru="Инструменты →">Tools <span aria-hidden="true">→</span></a>
@@ -217,7 +217,7 @@
         <ul>
           <li><a href="../index.html" data-ru="Обзор">Overview</a></li>
           <li><a href="../features.html" data-ru="Возможности">Features</a></li>
-          <li><a href="../faq.html" data-ru="Вопросы">FAQ</a></li>
+          <li><a href="../faq.html">FAQ</a></li>
           <li><a href="https://github.com/rokokol/obsidian-thing/blob/main/CHANGELOG.md" data-ru="Изменения">Changelog</a></li>
         </ul>
       </div>

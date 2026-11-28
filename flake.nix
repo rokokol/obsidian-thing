@@ -29,6 +29,57 @@
         pkgs:
         let
           inherit (builtins.fromTOML (builtins.readFile ./pyproject.toml)) project;
+          lockedPython = (builtins.fromTOML (builtins.readFile ./uv.lock)).package;
+          lockedPackage =
+            name: attrs:
+            let
+              package = lib.findFirst (entry: entry.name == name) null lockedPython;
+            in
+            pkgs.python3Packages.buildPythonPackage (
+              {
+                pname = name;
+                inherit (package) version;
+                pyproject = true;
+                src = pkgs.fetchurl {
+                  inherit (package.sdist) url;
+                  hash = builtins.convertHash {
+                    hash = lib.removePrefix "sha256:" package.sdist.hash;
+                    hashAlgo = "sha256";
+                    toHashFormat = "sri";
+                  };
+                };
+              }
+              // attrs
+            );
+          excalidrawRender = lockedPackage "excalidraw-render" {
+            build-system = with pkgs.python3Packages; [ hatchling ];
+            dependencies = with pkgs.python3Packages; [
+              cairosvg
+              pillow
+            ];
+            pythonImportsCheck = [ "excalidraw_render" ];
+            meta = {
+              description = "Export Excalidraw drawings without a browser";
+              homepage = "https://github.com/shivama205/excalidraw-render";
+              license = lib.licenses.mit;
+              mainProgram = "excalidraw-render";
+            };
+          };
+          lzString = lockedPackage "lzstring" {
+            build-system = with pkgs.python3Packages; [ setuptools ];
+            postPatch = ''
+              substituteInPlace setup.py --replace-fail "install_requires=['future>=0.14.0']" 'install_requires=[]'
+              substituteInPlace lzstring/__init__.py \
+                --replace-fail 'from future import standard_library' "" \
+                --replace-fail 'standard_library.install_aliases()' ""
+            '';
+            pythonImportsCheck = [ "lzstring" ];
+            meta = {
+              description = "Python decoder for LZ-String data";
+              homepage = "https://github.com/gkovacs/lz-string-python";
+              license = lib.licenses.mit;
+            };
+          };
           app = pkgs.python3Packages.buildPythonApplication {
             pname = project.name;
             version = lib.fileContents ./VERSION;
@@ -43,8 +94,11 @@
             };
             build-system = with pkgs.python3Packages; [ hatchling ];
             dependencies = with pkgs.python3Packages; [
+              cairosvg
               croniter
+              excalidrawRender
               inotify-simple
+              lzString
               pathspec
               markdown-it-py
               mcp
@@ -98,6 +152,7 @@
 
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShell {
+          LD_LIBRARY_PATH = lib.makeLibraryPath (with pkgs; [ cairo ]);
           packages = with pkgs; [
             actionlint
             ffmpeg-headless

@@ -9,6 +9,7 @@ Use the `integrations` table inside each vault configuration. See [the example c
 | `media_gallery` | `false` | Include Media Gallery blocks in the graph |
 | `iconic_offline` | `false` | Enable changes to Iconic file settings |
 | `fsrs_dictionary` | `false` | Enable FSRS Vocabulary tools |
+| `excalidraw` | `false` | Enable offline Excalidraw PNG export |
 
 A disabled integration does not scan or rewrite its references. The text tools still accept these files if the allowlist permits them
 
@@ -25,6 +26,14 @@ Enable `iconic_offline` only for a writable vault with `read_obsidian` on. Close
 Call `obsidian.iconic_set` after you create a file or when you change its appearance. Pass the existing file `path` and `changes`, such as `{"icon":"lucide-book","color":"blue"}`. Omit a field to keep it. Set it to `null` to clear it
 
 The tool changes only the named entry in the existing Iconic settings. It does not set an icon as part of `obsidian.write` or `obsidian.update`
+
+## Excalidraw
+
+Enable `excalidraw` to register `obsidian.excalidraw_render`. The tool takes an allowed vault path and an optional pixel `width`. It returns PNG data as MCP image content. It does not start Obsidian or write to the vault
+
+The tool reads `.excalidraw` scenes and Markdown drawings with the `excalidraw-plugin` property. It reads both plain and compressed scene blocks. It rejects embedded files and unsupported elements instead of omitting them. The renderer approximates hand-drawn strokes and replaces Excalidraw fonts
+
+For a Python installation, install `obsidian-thing[excalidraw]` and the system Cairo library. The Nix package includes the renderer and Cairo
 
 ## FSRS Vocabulary
 

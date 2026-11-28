@@ -11,8 +11,11 @@ dependencies = ["mcp>=2.3,<3", "starlette>=0.40,<2", "uvicorn>=0.31,<1", "ruamel
 [project.scripts]
 obsidian-thing = "obsidian_thing.__main__:main"
 
+[project.optional-dependencies]
+excalidraw = ["cairosvg>=2.8,<3", "excalidraw-render==0.3.0", "lzstring==1.0.4"]
+
 [dependency-groups]
-dev = ["httpx2", "pytest>=8,<10"]
+dev = ["httpx2", "pytest>=8,<10", "obsidian-thing[excalidraw]"]
 
 [tool.hatch.version]
 path = "VERSION"

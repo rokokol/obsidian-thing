@@ -1,5 +1,6 @@
 import os
 import re
+from base64 import b64encode
 from contextlib import AsyncExitStack, asynccontextmanager, contextmanager
 from hmac import compare_digest
 from pathlib import Path
@@ -7,7 +8,7 @@ from typing import Any
 
 from mcp.server import MCPServer
 from mcp.server.context import CallNext, HandlerResult, ServerRequestContext
-from mcp.types import CallToolResult, TextContent
+from mcp.types import CallToolResult, ImageContent, TextContent
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
@@ -21,6 +22,7 @@ from starlette.concurrency import run_in_threadpool
 from .checker import Checker, CheckerError
 from .embedding_schedule import EmbeddingSchedule
 from .embeddings import EmbeddingError
+from .excalidraw import DEFAULT_WIDTH, render_drawing
 from .fsrs import (Change as FsrsChange, DictionaryList, DictionaryPage, History, edit_dictionary,
                    history, list_dictionaries, read_dictionary)
 from .graph import Attachment, Backlinks, Edge
@@ -74,6 +76,7 @@ async def _plugin_tools(ctx: ServerRequestContext[Any, Any], call_next: CallNext
 def vault_server(
     name: str, vault: Vault, *, writable: bool = False, trash_dir: Path | None = None,
     search: SearchIndex | None = None, iconic_offline: bool = False, fsrs_dictionary: bool = False,
+    excalidraw: bool = False,
 ) -> MCPServer:
     server = MCPServer(name, middleware=[_plugin_tools])
 
@@ -95,6 +98,17 @@ def vault_server(
     def stat(path: str) -> FileInfo:
         with _tool_errors():
             return vault.stat(path)
+
+    if excalidraw:
+        @server.tool(name='obsidian.excalidraw_render', description=(
+            'Render a saved Excalidraw drawing as PNG without Obsidian. Pass a vault-relative path and optional width.'
+        ))
+        def excalidraw_render(path: str, width: int = DEFAULT_WIDTH) -> CallToolResult:
+            with _tool_errors():
+                png = render_drawing(vault, path, width)
+                image = ImageContent.model_validate({'type': 'image', 'mimeType': 'image/png',
+                                                     'data': b64encode(png).decode('ascii')})
+                return CallToolResult(content=[image])
 
     graph = vault.graph
 
@@ -382,7 +396,8 @@ def create_app(config: dict) -> Starlette:
         if not isinstance(read_obsidian, bool):
             raise ValueError('Configure read_obsidian as a boolean')
         integrations = settings.get('integrations', {})
-        defaults = dict(canvas=True, bases=True, media_gallery=False, iconic_offline=False, fsrs_dictionary=False)
+        defaults = dict(canvas=True, bases=True, media_gallery=False, iconic_offline=False, fsrs_dictionary=False,
+                        excalidraw=False)
         if (not isinstance(integrations, dict) or set(integrations) - defaults.keys() or
                 not all(isinstance(value, bool) for value in integrations.values())):
             raise ValueError('Configure integrations as a table of supported boolean switches')
@@ -443,7 +458,8 @@ def create_app(config: dict) -> Starlette:
                 if schedule.enabled:
                     schedules.append(schedule)
         server = vault_server(name, vault, writable=writable, trash_dir=trash_dir, search=search,
-                              iconic_offline=integrations['iconic_offline'], fsrs_dictionary=integrations['fsrs_dictionary'])
+                              iconic_offline=integrations['iconic_offline'], fsrs_dictionary=integrations['fsrs_dictionary'],
+                              excalidraw=integrations['excalidraw'])
         if metrics is not None:
             server.middleware.append(metrics.observe_mcp)
         app = server.streamable_http_app(stateless_http=True, json_response=True, transport_security=security)

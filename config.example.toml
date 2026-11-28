@@ -15,6 +15,7 @@ writable = false
 # media_gallery = false
 # iconic_offline = false
 # fsrs_dictionary = false
+# excalidraw = false
 
 # [vaults.notes.checks]
 # default_quotes = '""'

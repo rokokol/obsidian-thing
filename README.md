@@ -30,6 +30,7 @@ To restore a deletion, read `$trash_dir/<trash_id>/path` for the original vault-
 
 ## Documentation
 
+- [Obsidian plugin](docs/plugin.md): search the vault, explore related files and view index status from Obsidian
 - [Python write checker](docs/checker.md): configure a script to warn about or reject proposed edits
 - [Markdown rules for writes](docs/vault-rules.md): check quotes, periods, links and callout markers before a write
 - [Example checker](examples/checker.py): a starting point for vault-specific rules

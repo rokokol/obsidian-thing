@@ -1,4 +1,4 @@
-name: Publish container
+name: Publish container and Obsidian plugin
 
 on:
   push:
@@ -8,7 +8,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: publish-container-${{ github.ref }}
+  group: publish-release-${{ github.ref }}
 
 jobs:
   verify:
@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 25
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - uses: actions/checkout@v7
@@ -33,6 +33,14 @@ jobs:
           version=$(<VERSION)
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           [[ "$GITHUB_REF_NAME" == "v$version" ]]
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: plugin/.node-version
+      - name: Build the Obsidian plugin
+        working-directory: plugin
+        run: |
+          npm ci --ignore-scripts
+          npm run build
       - uses: cachix/install-nix-action@v31
       - name: Build release image
         run: |
@@ -48,3 +56,23 @@ jobs:
           target="ghcr.io/${GITHUB_REPOSITORY,,}:$(<VERSION)"
           docker tag obsidian-thing:local "$target"
           docker push "$target"
+      - name: Publish the Obsidian plugin
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          assets=(plugin/dist/main.js plugin/dist/manifest.json plugin/dist/styles.css)
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${assets[@]}"
+          else
+            awk -v version="$(<VERSION)" '
+              /^## / {
+                if (found) exit
+                if (index($0, "## [" version "] - ") == 1) found = 1
+                next
+              }
+              found { print }
+              END { if (!found) exit 1 }
+            ' CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
+            gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" \
+              --notes-file "$RUNNER_TEMP/release-notes.md" "${assets[@]}"
+          fi

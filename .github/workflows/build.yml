@@ -33,6 +33,16 @@ jobs:
           ./vendor-sync.sh check
           ./check-pins.sh
           ./scripts/no-secrets.sh
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: plugin/.node-version
+      - name: Test and build the Obsidian plugin
+        working-directory: plugin
+        run: |
+          npm ci --ignore-scripts
+          npm run check
+          npm test
+          npm run build
       - uses: cachix/install-nix-action@v31
       - name: Check workflows and Nix format
         run: |

@@ -1,0 +1,16 @@
+{
+  "name": "obsidian-thing-plugin",
+  "private": true,
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "node build.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.4",
+    "esbuild": "0.28.2",
+    "obsidian": "1.14.4",
+    "typescript": "5.9.3",
+    "vitest": "5.1.2"
+  }
+}

@@ -129,18 +129,18 @@
           <tbody>
             <tr><th scope="row"><code>ollama</code></th><td data-ru="Локальный, по умолчанию 127.0.0.1:11434">Local, <code>127.0.0.1:11434</code> by default</td><td><code>url</code></td></tr>
             <tr><th scope="row"><code>lm_studio</code></th><td data-ru="Локальный, по умолчанию 127.0.0.1:1234/v1">Local, <code>127.0.0.1:1234/v1</code> by default</td><td><code>base_url</code>, <code>request_dimensions</code></td></tr>
-            <tr><th scope="row"><code>openai</code></th><td data-ru="Свой совместимый адрес по HTTPS">Your own compatible address over HTTPS</td><td><code>base_url</code>, <code>key_env</code></td></tr>
-            <tr><th scope="row"><code>openrouter</code></th><td data-ru="Фиксированный адрес OpenRouter">The fixed OpenRouter endpoint</td><td><code>route</code>, <code>key_env</code>, <code>zdr</code>, <code>data_collection</code></td></tr>
+            <tr><th scope="row"><code>openai</code></th><td data-ru="Свой совместимый эндпоинт по HTTPS">Your own compatible address over HTTPS</td><td><code>base_url</code>, <code>key_env</code></td></tr>
+            <tr><th scope="row"><code>openrouter</code></th><td data-ru="Фиксированный эндпоинт OpenRouter">The fixed OpenRouter endpoint</td><td><code>route</code>, <code>key_env</code>, <code>zdr</code>, <code>data_collection</code></td></tr>
           </tbody>
         </table>
       </div>
-      <p data-ru="HTTP разрешён только на loopback, остальное требует HTTPS, и сервер не следует за перенаправлением. Векторы разделены по профилю: провайдер, адрес, модель, маршрут и размерность">HTTP is allowed on loopback only, everything else needs HTTPS, and the server follows no redirect. Vectors are separated by a profile: the provider, the address, the model, the route and the dimensions</p>
+      <p data-ru="HTTP разрешён только на loopback, остальное требует HTTPS. Сервер не следует за перенаправлением. Векторы разделены по профилю: провайдер, эндпоинт, модель, маршрут и размерность">HTTP is allowed on loopback only, everything else needs HTTPS, and the server follows no redirect. Vectors are separated by a profile: the provider, the address, the model, the route and the dimensions</p>
 
       <h2 data-ru="Вложения">Attachments</h2>
-      <p data-ru="По умолчанию индексируется только текст. Картинки, PDF, аудио и видео появляются в &lt;code&gt;allowed_mime_types&lt;/code&gt; по одному, и только маршрут Gemini через Vertex умеет их принимать">Only text is indexed by default. Images, PDF, audio and video join <code>allowed_mime_types</code> one type at a time, and only a Gemini route through Vertex accepts them</p>
+      <p data-ru="По умолчанию индексируется только текст. Картинки, PDF, аудио и видео добавляются в &lt;code&gt;allowed_mime_types&lt;/code&gt; по одному. Принимает их только маршрут Gemini через Vertex">Only text is indexed by default. Images, PDF, audio and video join <code>allowed_mime_types</code> one type at a time, and only a Gemini route through Vertex accepts them</p>
 
       <h2 data-ru="Разрешение на отправку">Permission to send</h2>
-      <p data-ru="&lt;code&gt;allow_cloud&lt;/code&gt; по умолчанию выключен, и удалённый провайдер молчит, пока не названы &lt;code&gt;include_paths&lt;/code&gt; — то есть пока не сказано, какие пути вообще могут уйти"><code>allow_cloud</code> is off by default, and a remote provider stays silent until <code>include_paths</code> names what may leave the machine at all</p>
+      <p data-ru="&lt;code&gt;allow_cloud&lt;/code&gt; по умолчанию выключен. Удалённый провайдер молчит, пока не названы &lt;code&gt;include_paths&lt;/code&gt;: это ответ на вопрос, какие пути вообще могут уйти"><code>allow_cloud</code> is off by default, and a remote provider stays silent until <code>include_paths</code> names what may leave the machine at all</p>
       <p data-ru="Если провайдер не ответил, &lt;code&gt;obsidian.query&lt;/code&gt; возвращает текстовые совпадения и ставит &lt;code&gt;vector_unavailable&lt;/code&gt;, а не пустой результат">If the provider fails, <code>obsidian.query</code> returns the text matches and sets <code>vector_unavailable</code> instead of returning nothing</p>
 
       <h2 data-ru="Расходы">Cost</h2>
@@ -165,7 +165,7 @@
       <p data-ru="С включённым бюджетом вызов без оценки не отправляется, как и любой следующий после вызова с неизвестной ценой">With a budget set, a call whose cost has no estimate is refused, and so is every call after one with an unknown cost</p>
 
       <h2 data-ru="Состояние индекса">The index status</h2>
-      <p data-ru="&lt;code&gt;obsidian.status&lt;/code&gt; отвечает без чтения заметок: покрытие последнего полного обхода, очередь, профиль модели и расходы по периодам и дням. Совпадения локального индекса и подтверждённая цена отделены от оценки"><code>obsidian.status</code> answers without reading any note: the coverage of the last full scan, the queue, the model profile and the cost by period and by day. Local hits and a confirmed price stay separate from an estimate</p>
+      <p data-ru="&lt;code&gt;obsidian.status&lt;/code&gt; отвечает, не читая заметок. Он возвращает покрытие последнего полного обхода, очередь, профиль модели и расходы по периодам и дням. Совпадения локального индекса и подтверждённая цена возвращаются отдельно от оценки"><code>obsidian.status</code> answers without reading any note: the coverage of the last full scan, the queue, the model profile and the cost by period and by day. Local hits and a confirmed price stay separate from an estimate</p>
 
       <h2 data-ru="Что не попадает в индекс">What stays out of the index</h2>
       <ul>
@@ -175,7 +175,7 @@
       </ul>
 
       <h2 data-ru="Карта в плагине">The map in the plugin</h2>
-      <p data-ru="&lt;code&gt;obsidian.map&lt;/code&gt; прячется от всех клиентов, кроме плагина: сервер требует заголовок &lt;code&gt;X-Obsidian-Thing-Client: plugin&lt;/code&gt;. Заголовок выбирает интерфейс, но не заменяет токен"><code>obsidian.map</code> hides from every client except the plugin: the server requires the header <code>X-Obsidian-Thing-Client: plugin</code>. The header selects an interface and never replaces the token</p>
+      <p data-ru="&lt;code&gt;obsidian.map&lt;/code&gt; прячется от всех клиентов, кроме плагина. Сервер требует заголовок &lt;code&gt;X-Obsidian-Thing-Client: plugin&lt;/code&gt;. Заголовок выбирает набор инструментов, но не заменяет токен"><code>obsidian.map</code> hides from every client except the plugin: the server requires the header <code>X-Obsidian-Thing-Client: plugin</code>. The header selects an interface and never replaces the token</p>
 
       <div class="doc-next">
         <a class="button" href="../tools.html" data-ru="Инструменты →">Tools <span aria-hidden="true">→</span></a>

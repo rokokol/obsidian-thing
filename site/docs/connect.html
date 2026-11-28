@@ -116,7 +116,7 @@ state_dir = "/var/lib/obsidian-thing/notes"</code></pre>
       <p data-ru="Без Nix: uv run --locked obsidian-thing --config config.toml. Адрес по умолчанию — 127.0.0.1:8765, и сервер печатает его при старте">Without Nix: <code>uv run --locked obsidian-thing --config config.toml</code>. The default address is <code>127.0.0.1:8765</code>, and the server prints it at start</p>
 
       <h2 id="client" data-ru="4. Направить клиент на эндпоинт">4. Point the client at the endpoint</h2>
-      <p data-ru="Клиенту нужны адрес и заголовок Authorization. Ниже — форма, которую понимает большинство клиентов; подставь токен или синтаксис подстановки самого клиента">The client needs the address and an <code>Authorization</code> header. The shape below is what most clients accept; substitute the token, or your client's own variable syntax</p>
+      <p data-ru="Клиенту нужны эндпоинт и заголовок Authorization. Ниже — форма, которую понимает большинство клиентов. Подставь токен или синтаксис подстановки самого клиента">The client needs the address and an <code>Authorization</code> header. The shape below is what most clients accept; substitute the token, or your client's own variable syntax</p>
       <pre data-lang="json"><code>{
   "mcpServers": {
     "notes": {
@@ -145,7 +145,7 @@ state_dir = "/var/lib/obsidian-thing/notes"</code></pre>
             </tr>
           </thead>
           <tbody>
-            <tr><th scope="row" data-ru="Токен одного волта на адрес другого">One vault's token on another address</th><td><code>401</code></td></tr>
+            <tr><th scope="row" data-ru="Токен одного волта на эндпоинт другого">One vault's token on another address</th><td><code>401</code></td></tr>
             <tr><th scope="row" data-ru="Идентификатор волта, которого нет в конфигурации">A vault ID the configuration does not name</th><td><code>404</code></td></tr>
             <tr><th scope="row" data-ru="Host вне allowed_hosts">A <code>Host</code> outside <code>allowed_hosts</code></th><td><code>421</code>, <span data-ru="Invalid Host header">Invalid Host header</span></td></tr>
             <tr><th scope="row" data-ru="&lt;code&gt;obsidian.read&lt;/code&gt; файла, который ты поправил руками"><code>obsidian.read</code> of a file you edited by hand</th><td data-ru="Новая ревизия">The new revision</td></tr>
@@ -156,17 +156,17 @@ state_dir = "/var/lib/obsidian-thing/notes"</code></pre>
       <h2 id="deployment" data-ru="Развёртывание">Deployment</h2>
       <p data-ru="За обратным прокси имя хоста должно быть в allowed_hosts, а Authorization прокси передаёт без изменений. Контейнеру нужен адрес 0.0.0.0, потому что внутри он слушает loopback">Behind a reverse proxy the host name belongs in <code>allowed_hosts</code>, and the proxy forwards <code>Authorization</code> unchanged. A container needs <code>--host 0.0.0.0</code>, because it listens on loopback by default</p>
       <div class="cmd"><code>docker run --rm --read-only --user "$(id -u):$(id -g)" --publish 127.0.0.1:8765:8765 --env OBSIDIAN_THING_NOTES_TOKEN --volume /srv/config.toml:/config.toml:ro --volume /srv/notes:/vault:ro obsidian-thing:local --config /config.toml --host 0.0.0.0</code><button class="copy-button" type="button" data-copy="docker run --rm --read-only --user &quot;$(id -u):$(id -g)&quot; --publish 127.0.0.1:8765:8765 --env OBSIDIAN_THING_NOTES_TOKEN --volume /srv/config.toml:/config.toml:ro --volume /srv/notes:/vault:ro obsidian-thing:local --config /config.toml --host 0.0.0.0" aria-label="Copy command" data-ru-aria-label="Скопировать команду"></button></div>
-      <p data-ru="Модуль NixOS пишет конфигурацию из settings, создаёт приватные каталоги состояния и запускает службу от непривилегированного пользователя">The NixOS module writes the configuration from <code>settings</code>, creates the private state directories and runs the service as an unprivileged user</p>
+      <p data-ru="Модуль NixOS пишет конфигурацию из settings. Он же создаёт приватные каталоги состояния и запускает службу от непривилегированного пользователя">The NixOS module writes the configuration from <code>settings</code>, creates the private state directories and runs the service as an unprivileged user</p>
       <p class="footnote" data-ru="Nix, Docker, прокси, корзина и каталог состояния: &lt;a href=&quot;https://github.com/rokokol/obsidian-thing/blob/main/docs/deployment.md&quot;&gt;docs/deployment.md&lt;/a&gt; · модуль: &lt;a href=&quot;https://github.com/rokokol/obsidian-thing/blob/main/docs/nixos.md&quot;&gt;docs/nixos.md&lt;/a&gt; &lt;span aria-hidden=&quot;true&quot;&gt;↗&lt;/span&gt;">Nix, Docker, the proxy, the trash and the state directory: <a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/deployment.md">docs/deployment.md</a> · the module: <a href="https://github.com/rokokol/obsidian-thing/blob/main/docs/nixos.md">docs/nixos.md</a> <span aria-hidden="true">↗</span></p>
 
       <h2 id="plugin" data-ru="Плагин Obsidian">The Obsidian plugin</h2>
       <ol>
-        <li data-ru="Скачай &lt;code&gt;manifest.json&lt;/code&gt;, &lt;code&gt;main.js&lt;/code&gt; и &lt;code&gt;styles.css&lt;/code&gt; из одного релиза и положи в &lt;code&gt;.obsidian/plugins/obsidian-thing/&lt;/code&gt;, затем включи плагин в Community plugins">Download <code>manifest.json</code>, <code>main.js</code> and <code>styles.css</code> from one release, put them in <code>.obsidian/plugins/obsidian-thing/</code>, then enable the plugin under Community plugins</li>
+        <li data-ru="Скачай &lt;code&gt;manifest.json&lt;/code&gt;, &lt;code&gt;main.js&lt;/code&gt; и &lt;code&gt;styles.css&lt;/code&gt; из одного релиза. Положи их в &lt;code&gt;.obsidian/plugins/obsidian-thing/&lt;/code&gt; и включи плагин в разделе Community plugins">Download <code>manifest.json</code>, <code>main.js</code> and <code>styles.css</code> from one release, put them in <code>.obsidian/plugins/obsidian-thing/</code>, then enable the plugin under Community plugins</li>
         <li data-ru="В настройках укажи полный эндпоинт, включая /vaults/&lt;vault_id&gt;/mcp. Вне доверенной сети — только HTTPS">In the settings, enter the full endpoint, including <code>/vaults/&lt;vault_id&gt;/mcp</code>. Outside a trusted network use HTTPS only</li>
         <li data-ru="Вставь токен в поле хранения: плагин положит его в Secret Storage Obsidian, а в &lt;code&gt;data.json&lt;/code&gt; останется только идентификатор секрета">Paste the token into the storage field: the plugin writes it to Obsidian's secret storage and keeps only the secret ID in <code>data.json</code></li>
         <li data-ru="Нажми Test: плагин покажет список инструментов, которые сервер отдаёт этому волту, и спрячет остальное">Press Test: the plugin shows the tools the server offers this vault, and hides the rest</li>
       </ol>
-      <p data-ru="Плагин не индексирует волт и не правит заметки. Поиск, соседи, карта и статус приходят из серверного индекса, а вызов провайдера может сделать только сервер">The plugin keeps no index and edits no notes. Search, neighbours, the map and the status come from the server's index, and only the server can call a provider</p>
+      <p data-ru="Плагин не индексирует волт и не правит заметки. Поиск, соседи, карта и статус приходят из серверного индекса. Вызов провайдера может сделать только сервер">The plugin keeps no index and edits no notes. Search, neighbours, the map and the status come from the server's index, and only the server can call a provider</p>
 
       <div class="doc-next">
         <a class="button" href="./safety.html" data-ru="Дальше: права и правила →">Next: permissions <span aria-hidden="true">→</span></a>

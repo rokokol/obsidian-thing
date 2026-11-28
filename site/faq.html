@@ -89,38 +89,38 @@
         <details>
           <summary data-ru="Это работает с Obsidian Sync?">Does it work with Obsidian Sync?</summary>
           <div class="answer">
-            <p data-ru="Так же, как с любой синхронизацией: сервер видит то, что лежит в каталоге. Изменения, пришедшие снаружи, он замечает наблюдением за файлами и периодическим обходом, а на Linux ещё и событиями inotify">The same way it works with any sync: the server sees what the directory holds. An outside change is noticed by the file watcher and by a periodic scan, and on Linux by inotify events as well</p>
-            <p data-ru="Одно исключение — конкурентная запись: ревизия защищает от того, что сервер может увидеть, но не от чужого процесса, который пишет файл в тот же момент">One exception is a concurrent write: a revision protects against what the server can see, not against another process writing the same file at the same moment</p>
+            <p data-ru="Так же, как с любой синхронизацией: сервер видит то, что лежит в каталоге. Внешние изменения он замечает наблюдением за файлами и периодическим обходом. На Linux к этому добавляются события inotify">The same way it works with any sync: the server sees what the directory holds. An outside change is noticed by the file watcher and by a periodic scan, and on Linux by inotify events as well</p>
+            <p data-ru="Одно исключение — конкурентная запись. Ревизия защищает от того, что сервер может увидеть. От чужого процесса, который пишет тот же файл в тот же момент, она не защищает">One exception is a concurrent write: a revision protects against what the server can see, not against another process writing the same file at the same moment</p>
           </div>
         </details>
         <details>
           <summary data-ru="Насколько безопасна запись?">How safe is writing?</summary>
           <div class="answer">
-            <p data-ru="Запись выключена по умолчанию. Во включаемом волте каждая правка несёт ревизию, заменяет файл атомарно, проходит правила волта и доверенный Python-чекер, а отказ любого из них оставляет файл как был">Writing is off by default. In a writable vault every edit carries a revision, replaces the file atomically, passes the vault rules and a trusted Python checker, and a refusal from any of them leaves the file as it was</p>
+            <p data-ru="Запись выключена по умолчанию. Там, где она включена, каждая правка несёт ревизию и заменяет файл атомарно. Правка проходит правила волта и доверенный Python-чекер. Отказ любого из них оставляет файл как был">Writing is off by default. In a writable vault every edit carries a revision, replaces the file atomically, passes the vault rules and a trusted Python checker, and a refusal from any of them leaves the file as it was</p>
           </div>
         </details>
         <details>
           <summary data-ru="Что будет, если два агента пишут одновременно?">What happens when two agents write at once?</summary>
           <div class="answer">
-            <p data-ru="Один процесс сериализует правки и сверяет ревизию перед каждой, поэтому второй агент получит отказ и перечитает файл. Два процесса на одном волте так не работают: сверка перестаёт что-либо значить. Запускай один процесс на волт с записью">One process serializes the edits and checks the revision before each one, so the second agent gets a refusal and reads the file again. Two processes on one vault break that: the check stops meaning anything. Run one process for each writable vault</p>
+            <p data-ru="Один процесс выполняет правки по очереди и перед каждой сверяет ревизию. Второй агент получит отказ и перечитает файл. Два процесса на одном волте так не работают: сверка теряет смысл. Держи один процесс на волт, куда идёт запись">One process serializes the edits and checks the revision before each one, so the second agent gets a refusal and reads the file again. Two processes on one vault break that: the check stops meaning anything. Run one process for each writable vault</p>
           </div>
         </details>
         <details>
           <summary data-ru="Куда попадает токен?">Where does the token go?</summary>
           <div class="answer">
-            <p data-ru="В переменную окружения, имя которой задаёт &lt;code&gt;token_env&lt;/code&gt;. В конфигурации лежит только имя. Плагин Obsidian хранит сам токен в своём Secret Storage, а в &lt;code&gt;data.json&lt;/code&gt; оставляет идентификатор секрета">Into the environment variable that <code>token_env</code> names. The configuration holds only that name. The Obsidian plugin keeps the token itself in Obsidian's secret storage and leaves only the secret ID in <code>data.json</code></p>
+            <p data-ru="В переменную окружения. Её имя задаёт &lt;code&gt;token_env&lt;/code&gt;, а в конфигурации хранится только имя. Плагин Obsidian держит сам токен в Secret Storage и оставляет в &lt;code&gt;data.json&lt;/code&gt; идентификатор секрета">Into the environment variable that <code>token_env</code> names. The configuration holds only that name. The Obsidian plugin keeps the token itself in Obsidian's secret storage and leaves only the secret ID in <code>data.json</code></p>
           </div>
         </details>
         <details>
           <summary data-ru="Заметки уходят на сервер провайдера?">Do my notes reach a provider?</summary>
           <div class="answer">
-            <p data-ru="Без явного разрешения — нет. Векторный поиск требует провайдера, удалённая отправка — &lt;code&gt;allow_cloud&lt;/code&gt; и &lt;code&gt;include_paths&lt;/code&gt;, и только после этого текст покидает машину. Текстовый поиск и фильтры по метаданным модели не вызывают вовсе">Not without an explicit permission. Vector search needs a provider, and a remote send needs <code>allow_cloud</code> and <code>include_paths</code>; only then does text leave the machine. Text search and metadata filters never call a model</p>
+            <p data-ru="Без явного разрешения — нет. Векторный поиск обращается к провайдеру. Удалённая отправка требует &lt;code&gt;allow_cloud&lt;/code&gt; и &lt;code&gt;include_paths&lt;/code&gt;, и только тогда текст покидает машину. Текстовый поиск и фильтры по метаданным к модели не обращаются">Not without an explicit permission. Vector search needs a provider, and a remote send needs <code>allow_cloud</code> and <code>include_paths</code>; only then does text leave the machine. Text search and metadata filters never call a model</p>
           </div>
         </details>
         <details>
           <summary data-ru="Можно ли обойтись без эмбеддингов?">Can I run it without embeddings?</summary>
           <div class="answer">
-            <p data-ru="Да. Волт с &lt;code&gt;state_dir&lt;/code&gt; и &lt;code&gt;enabled = false&lt;/code&gt; получает полнотекстовый поиск, фильтры и весь граф ссылок, но не получает &lt;code&gt;related&lt;/code&gt; и &lt;code&gt;map&lt;/code&gt;, которым нужны векторы">Yes. A vault with <code>state_dir</code> and <code>enabled = false</code> gets full-text search, the filters and the whole link graph, but not <code>related</code> and <code>map</code>, which need vectors</p>
+            <p data-ru="Да. Волт с &lt;code&gt;state_dir&lt;/code&gt; и &lt;code&gt;enabled = false&lt;/code&gt; получает полнотекстовый поиск, фильтры и весь граф ссылок. Инструментов &lt;code&gt;related&lt;/code&gt; и &lt;code&gt;map&lt;/code&gt; в нём нет: им нужны векторы">Yes. A vault with <code>state_dir</code> and <code>enabled = false</code> gets full-text search, the filters and the whole link graph, but not <code>related</code> and <code>map</code>, which need vectors</p>
           </div>
         </details>
         <details>
@@ -132,7 +132,7 @@
         <details>
           <summary data-ru="Есть ли мобильное приложение?">Is there a mobile app?</summary>
           <div class="answer">
-            <p data-ru="Нет и не планируется: это сервер, а клиентом выступает агент или плагин Obsidian на компьютере. Мобильный Obsidian плагин не поддерживает">No, and none is planned: this is a server, and the clients are an agent or the desktop Obsidian plugin. Mobile Obsidian cannot run the plugin</p>
+            <p data-ru="Нет и не планируется. Это сервер, а клиент — агент или плагин Obsidian на компьютере. Мобильный Obsidian плагин не поддерживает">No, and none is planned: this is a server, and the clients are an agent or the desktop Obsidian plugin. Mobile Obsidian cannot run the plugin</p>
           </div>
         </details>
         <details>

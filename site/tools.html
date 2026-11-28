@@ -90,7 +90,7 @@
 
       <div class="tool-group" data-group-table>
         <h2 data-ru="Один волт, разные наборы">One vault, several sets</h2>
-        <p data-ru="Клиент видит только те инструменты, которые разрешает конфигурация его волта. Чтение доступно всегда, запись — только в волте с &lt;code&gt;writable = true&lt;/code&gt;, а инструменты поиска — когда задан &lt;code&gt;state_dir&lt;/code&gt;">A client sees only the tools that its vault's configuration allows. Reading is always on, writing only in a vault with <code>writable = true</code>, and the search tools only when <code>state_dir</code> is set</p>
+        <p data-ru="Клиент видит только те инструменты, которые разрешает конфигурация его волта. Чтение доступно всегда. Запись — только в волте с &lt;code&gt;writable = true&lt;/code&gt;. Инструменты поиска — только когда задан &lt;code&gt;state_dir&lt;/code&gt;">A client sees only the tools that its vault's configuration allows. Reading is always on, writing only in a vault with <code>writable = true</code>, and the search tools only when <code>state_dir</code> is set</p>
       </div>
 
       <div class="tool-group" data-group-table>
@@ -125,7 +125,7 @@
 
       <div class="tool-group" data-group-table>
         <h2 data-ru="Запись">Writing</h2>
-        <p data-ru="Семь инструментов волта с &lt;code&gt;writable = true&lt;/code&gt;. &lt;code&gt;delete&lt;/code&gt; появляется, когда задана корзина, а &lt;code&gt;memory_delete&lt;/code&gt; и &lt;code&gt;memory_index_write&lt;/code&gt; работают только с каталогом памяти">Seven tools for a vault with <code>writable = true</code>. <code>delete</code> appears when a trash is configured, and the two memory writers work on the memory directory alone</p>
+        <p data-ru="Семь инструментов волта с &lt;code&gt;writable = true&lt;/code&gt;. &lt;code&gt;delete&lt;/code&gt; появляется, когда задана корзина. &lt;code&gt;memory_delete&lt;/code&gt; и &lt;code&gt;memory_index_write&lt;/code&gt; работают только с каталогом памяти">Seven tools for a vault with <code>writable = true</code>. <code>delete</code> appears when a trash is configured, and the two memory writers work on the memory directory alone</p>
         <div class="table-wrap">
           <table>
             <caption data-ru="Инструменты записи">Writing tools</caption>
@@ -147,7 +147,7 @@
             </tbody>
           </table>
         </div>
-        <p data-ru="Каждый отказывает, если предложенный текст нарушит правило волта, сломает YAML, Canvas или Base, или если чекер вернёт отказ">Each one refuses when the proposed text breaks a vault rule, makes YAML, Canvas or Base invalid, or when the checker rejects the change</p>
+        <p data-ru="Каждый отказывает в трёх случаях: текст нарушит правило волта, сломает YAML, Canvas или Base, или чекер вернёт отказ">Each one refuses when the proposed text breaks a vault rule, makes YAML, Canvas or Base invalid, or when the checker rejects the change</p>
       </div>
 
       <div class="tool-group" data-group-table>
@@ -179,10 +179,10 @@
 
       <div class="tool-group" data-group-table>
         <h2 data-ru="Поиск">Search</h2>
-        <p data-ru="Шесть инструментов волта с &lt;code&gt;state_dir&lt;/code&gt;. &lt;code&gt;related&lt;/code&gt; и &lt;code&gt;map&lt;/code&gt; требуют профиля эмбеддинга, а &lt;code&gt;map&lt;/code&gt; сервер прячет от всех, кроме клиента плагина">Six tools for a vault with <code>state_dir</code>. <code>related</code> and <code>map</code> need an embedding profile, and the server hides <code>map</code> from every client except the plugin</p>
+        <p data-ru="Шесть инструментов волта с &lt;code&gt;state_dir&lt;/code&gt;. &lt;code&gt;related&lt;/code&gt; и &lt;code&gt;map&lt;/code&gt; требуют профиля эмбеддинга. &lt;code&gt;map&lt;/code&gt; сервер прячет от всех, кроме клиента плагина">Six tools for a vault with <code>state_dir</code>. <code>related</code> and <code>map</code> need an embedding profile, and the server hides <code>map</code> from every client except the plugin</p>
         <div class="callout">
           <span class="callout-title">obsidian.map</span>
-          <p data-ru="&lt;code&gt;obsidian.map&lt;/code&gt; не попадает в контекст агента: сервер убирает его из &lt;code&gt;tools/list&lt;/code&gt; и отвечает на прямой вызов «Unknown tool», пока клиент не пришлёт заголовок &lt;code&gt;X-Obsidian-Thing-Client: plugin&lt;/code&gt;. Заголовок посылает плагин, а агент — нет, поэтому карта остаётся вне контекста модели: 32 инструмента видит плагин, 31 — агент"><code>obsidian.map</code> never reaches an agent's context: the server drops it from <code>tools/list</code> and answers a direct call with <code>Unknown tool</code> unless the client sends <code>X-Obsidian-Thing-Client: plugin</code>. The plugin sends that header and an agent does not, so the map stays outside the model's context: the plugin sees 32 tools and an agent sees 31</p>
+          <p data-ru="&lt;code&gt;obsidian.map&lt;/code&gt; не попадает в контекст агента. Сервер убирает его из &lt;code&gt;tools/list&lt;/code&gt; и отвечает на прямой вызов «Unknown tool». Так продолжается, пока клиент не пришлёт заголовок &lt;code&gt;X-Obsidian-Thing-Client: plugin&lt;/code&gt;. Заголовок посылает плагин, агент — нет. Поэтому плагин видит 32 инструмента, а агент — 31"><code>obsidian.map</code> never reaches an agent's context: the server drops it from <code>tools/list</code> and answers a direct call with <code>Unknown tool</code> unless the client sends <code>X-Obsidian-Thing-Client: plugin</code>. The plugin sends that header and an agent does not, so the map stays outside the model's context: the plugin sees 32 tools and an agent sees 31</p>
         </div>
         <div class="table-wrap">
           <table>

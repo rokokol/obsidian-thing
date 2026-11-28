@@ -78,7 +78,7 @@
       <div>
         <span class="kicker" data-ru="MCP Streamable HTTP · токен на волт · MIT">MCP Streamable HTTP · one token per vault · MIT</span>
         <h1 data-ru="Твой волт. Один эндпоинт. &lt;em&gt;Твои правила.&lt;/em&gt;">Your vault. One endpoint. <em>Your rules.</em></h1>
-        <p class="lead" data-ru="Obsidian Thing отдаёт волт Obsidian по MCP Streamable HTTP. Чтение не требует запущенного приложения, запись несёт ревизию, на которой её построили, а менять файлы разрешают твои правила. Поиск остаётся на твоей машине, пока ты не разрешишь иное">Obsidian Thing serves an Obsidian vault over MCP Streamable HTTP. Reads need no running app, a write carries the revision it was built on, and your own rules decide what may change. Search stays on your machine unless you permit otherwise</p>
+        <p class="lead" data-ru="Obsidian Thing отдаёт волт Obsidian по MCP Streamable HTTP. Для чтения приложение не нужно. Запись несёт ревизию, на которой её построили, а менять файлы разрешают твои правила. Поиск идёт на твоей машине, пока ты не разрешишь иное">Obsidian Thing serves an Obsidian vault over MCP Streamable HTTP. Reads need no running app, a write carries the revision it was built on, and your own rules decide what may change. Search stays on your machine unless you permit otherwise</p>
         <div class="actions">
           <a class="button primary" href="#install" data-ru="Установить сервер &lt;span aria-hidden=&quot;true&quot;&gt;→&lt;/span&gt;">Install the server <span aria-hidden="true">→</span></a>
           <a class="button" href="./docs/index.html" data-ru="Читать документацию">Read the docs</a>
@@ -119,14 +119,14 @@
           <p class="endpoint-foot" data-ru="allowlist: Notes, AGENTS.md · writable: нет">allowlist: Notes, AGENTS.md · writable: no</p>
           <button class="button primary" type="button" data-dialog-open="minimap" data-ru="Открыть карту окрестности">Open the neighbourhood map</button>
         </div>
-        <p class="footnote" data-ru="Карточка — рисунок: ни один запрос не покидает страницу">The card is a drawing: no request leaves this page</p>
+        <p class="footnote" data-ru="На карточке рисунок, а не запрос: страница никуда не обращается">The card is a drawing: no request leaves this page</p>
       </div>
     </div>
   </section>
 
   <dialog class="minimap" id="minimap" aria-labelledby="minimap-title">
     <h2 id="minimap-title" data-ru="Карта окрестности">Neighbourhood map</h2>
-    <p data-ru="Так выглядит ответ &lt;code&gt;obsidian.map&lt;/code&gt;: исходная заметка и её ближайшие соседи на двух осях. Координаты здесь нарисованы, страница ничего не запрашивает. Порядок и оценка приходят из векторов, а не из положения на рисунке">This is what <code>obsidian.map</code> answers: the source note and its nearest neighbours on two axes. The coordinates are drawn here, and the page requests nothing. The order and the score come from the vectors, not from the position</p>
+    <p data-ru="Так выглядит ответ &lt;code&gt;obsidian.map&lt;/code&gt;. В центре исходная заметка, вокруг — её ближайшие соседи, всё на двух осях. Координаты нарисованы, страница ничего не запрашивает. Порядок и оценку задают векторы, а не положение на рисунке">This is what <code>obsidian.map</code> answers: the source note and its nearest neighbours on two axes. The coordinates are drawn here, and the page requests nothing. The order and the score come from the vectors, not from the position</p>
     <canvas id="minimap-canvas" aria-hidden="true"></canvas>
     <div class="minimap-foot">
       <p class="status" id="minimap-readout" data-ru="7 файлов · explained 0.34 / 0.21 · ранг из векторов">7 files · explained 0.34 / 0.21 · rank from the vectors</p>
@@ -163,8 +163,8 @@
     <div class="wrap">
       <div class="section-head">
         <span class="kicker" data-ru="Что получает агент">What the agent gets</span>
-        <h2 data-ru="Чтение, запись, поиск и связи — по одному адресу">Reading, writing, search and links, on one address</h2>
-        <p data-ru="Инструменты одного волта не похожи на инструменты другого: сервер показывает клиенту только то, что разрешено в конфигурации этого волта">One vault does not offer the tools of another: the server shows a client only what the configuration of that vault allows</p>
+        <h2 data-ru="Чтение, запись, поиск и связи — на одном эндпоинте">Reading, writing, search and links, on one endpoint</h2>
+        <p data-ru="Инструменты одного волта не похожи на инструменты другого. Клиент видит только то, что разрешает конфигурация его волта">One vault does not offer the tools of another: the server shows a client only what the configuration of that vault allows</p>
       </div>
       <div class="grid grid-2">
         <a class="card" href="./tools.html#reading">
@@ -180,7 +180,7 @@
         <a class="card" href="./docs/safety.html">
           <span class="sticker alt" data-ru="запись">writing</span>
           <h3 data-ru="Замена, правка фрагмента, переименование">Replace, edit a fragment, rename</h3>
-          <p data-ru="Запись выключена по умолчанию. Во включаемом волте она идёт атомарной заменой по ревизии, а правила и Python-чекер могут отклонить предложенный текст до того, как он попадёт на диск">Writing is off by default. In a writable vault it is an atomic replacement at a revision, and rules or a Python checker can reject the proposed text before it reaches disk</p>
+          <p data-ru="Запись выключена по умолчанию. Там, где она включена, правка идёт атомарной заменой по ревизии. Правила и Python-чекер могут отклонить текст до того, как он попадёт на диск">Writing is off by default. In a writable vault it is an atomic replacement at a revision, and rules or a Python checker can reject the proposed text before it reaches disk</p>
           <ul>
             <li data-ru="&lt;code&gt;obsidian.update&lt;/code&gt; заменяет один точный фрагмент"><code>obsidian.update</code> replaces one exact fragment</li>
             <li data-ru="Переименование правит видимые ссылки">A rename updates the visible links</li>
@@ -216,7 +216,7 @@
       <div class="section-head">
         <span class="kicker" data-ru="Скиллы, память и инструкции">Skills, memory, instructions</span>
         <h2 data-ru="Волт приносит свои правила и свои скиллы">The vault brings its own rules, and its own skills</h2>
-        <p data-ru="Агенту нужны три вещи, которые не являются заметками: правила волта, скиллы, написанные под него, и то, что узнали прошлые сессии. Всё это лежит в скрытых путях, куда не достаёт чтение обычного файла. Сервер отдаёт их по имени — рядом со скиллами, которые агент уже несёт">An agent needs three things that are not notes: the rules of the vault, the skills written for it, and what earlier sessions learned. All three sit in hidden paths, which a plain read never reaches. The server serves them by name, beside the skills the agent already carries</p>
+        <p data-ru="Агенту нужны три вещи, которые не являются заметками: правила волта, скиллы под этот волт и то, что узнали прошлые сессии. Всё это лежит в скрытых путях, куда обычное чтение не достаёт. Сервер отдаёт их по имени, рядом со скиллами, которые агент уже несёт">An agent needs three things that are not notes: the rules of the vault, the skills written for it, and what earlier sessions learned. All three sit in hidden paths, which a plain read never reaches. The server serves them by name, beside the skills the agent already carries</p>
       </div>
       <div class="grid grid-2">
         <div>
@@ -224,19 +224,19 @@
             <li class="step">
               <div>
                 <h3 data-ru="Инструкции идут первыми">Instructions come first</h3>
-                <p data-ru="&lt;code&gt;obsidian.agentsmd&lt;/code&gt; возвращает первый читаемый файл настроенного списка, так что &lt;code&gt;AGENTS.md&lt;/code&gt; не прячется за &lt;code&gt;GEMINI.md&lt;/code&gt;, а файл вне allowlist не скрывает тот, что внутри"><code>obsidian.agentsmd</code> returns the first readable file of the configured list, so <code>AGENTS.md</code> never hides behind <code>GEMINI.md</code>, and a file outside the allowlist never hides one inside it</p>
+                <p data-ru="&lt;code&gt;obsidian.agentsmd&lt;/code&gt; возвращает первый читаемый файл из настроенного списка. Так &lt;code&gt;AGENTS.md&lt;/code&gt; не прячется за &lt;code&gt;GEMINI.md&lt;/code&gt;, а файл вне allowlist не скрывает тот, что внутри"><code>obsidian.agentsmd</code> returns the first readable file of the configured list, so <code>AGENTS.md</code> never hides behind <code>GEMINI.md</code>, and a file outside the allowlist never hides one inside it</p>
               </div>
             </li>
             <li class="step">
               <div>
                 <h3 data-ru="Скиллы волта читаются по имени">The vault's skills, read by name</h3>
-                <p data-ru="&lt;code&gt;obsidian.skills_list&lt;/code&gt; перечисляет каталог &lt;code&gt;.agents/skills&lt;/code&gt;: имя, описание и путь к &lt;code&gt;SKILL.md&lt;/code&gt;. &lt;code&gt;obsidian.skill_read&lt;/code&gt; читает сам скилл и его справочные файлы"><code>obsidian.skills_list</code> lists <code>.agents/skills</code> with each name, description and <code>SKILL.md</code> path. <code>obsidian.skill_read</code> reads the skill and its reference files</p>
+                <p data-ru="&lt;code&gt;obsidian.skills_list&lt;/code&gt; перечисляет каталог &lt;code&gt;.agents/skills&lt;/code&gt; с именами, описаниями и путями к &lt;code&gt;SKILL.md&lt;/code&gt;. &lt;code&gt;obsidian.skill_read&lt;/code&gt; читает сам скилл и его справочные файлы"><code>obsidian.skills_list</code> lists <code>.agents/skills</code> with each name, description and <code>SKILL.md</code> path. <code>obsidian.skill_read</code> reads the skill and its reference files</p>
               </div>
             </li>
             <li class="step">
               <div>
                 <h3 data-ru="Память переживает сессию">Memory outlives the session</h3>
-                <p data-ru="&lt;code&gt;obsidian.memory_read&lt;/code&gt; и &lt;code&gt;memory_list&lt;/code&gt; читают заметки в &lt;code&gt;.agents/memory&lt;/code&gt;, а &lt;code&gt;memory_write&lt;/code&gt; пишет заметку и строку о ней в &lt;code&gt;MEMORY.md&lt;/code&gt; — но только в волте с включённой записью"><code>obsidian.memory_read</code> and <code>memory_list</code> read the notes in <code>.agents/memory</code>, and <code>memory_write</code> writes a note and its line in <code>MEMORY.md</code>, in a writable vault only</p>
+                <p data-ru="&lt;code&gt;obsidian.memory_read&lt;/code&gt; и &lt;code&gt;memory_list&lt;/code&gt; читают заметки в &lt;code&gt;.agents/memory&lt;/code&gt;. &lt;code&gt;memory_write&lt;/code&gt; пишет заметку и её строку в &lt;code&gt;MEMORY.md&lt;/code&gt;, и только в волте, где включена запись"><code>obsidian.memory_read</code> and <code>memory_list</code> read the notes in <code>.agents/memory</code>, and <code>memory_write</code> writes a note and its line in <code>MEMORY.md</code>, in a writable vault only</p>
               </div>
             </li>
           </ol>
@@ -255,7 +255,7 @@
               <li><span class="tool-name">obsidian.memory_read</span><span class="tool-ms">1 ms</span></li>
               <li class="hit">weekly-review <span class="sub" data-ru="тип: project">type: project</span><span class="score">rv 7c11</span></li>
             </ul>
-            <p class="muted" data-ru="Так скилл из волта встаёт рядом со скиллами, которые агент уже несёт: своё загружает среда, правила волта приходят вместе с волтом, и ни те ни другие не ходят через allowlist файлов">So a skill in the vault stands beside the skills the agent already carries: the harness loads its own, the vault's rules arrive with the vault, and neither reaches through the file allowlist</p>
+            <p class="muted" data-ru="Так скилл из волта встаёт рядом со скиллами, которые агент уже несёт. Свои скиллы загружает среда, правила волта приходят вместе с волтом. Ни те ни другие не ходят через allowlist файлов">So a skill in the vault stands beside the skills the agent already carries: the harness loads its own, the vault's rules arrive with the vault, and neither reaches through the file allowlist</p>
             <ul class="chips">
               <li class="chip">AGENTS.md</li>
               <li class="chip">.agents/skills</li>
@@ -418,7 +418,7 @@
     <div class="wrap">
       <div class="ddlc-inform">
         <p class="ddlc-inform-title" data-ru="Всё остаётся у тебя">Nothing leaves your machine</p>
-        <p data-ru="MIT, без аккаунта и без телеметрии. Удалённый провайдер эмбеддингов получает текст только после явного &lt;code&gt;allow_cloud&lt;/code&gt; и только из путей &lt;code&gt;include_paths&lt;/code&gt; — и это видно в &lt;code&gt;obsidian.status&lt;/code&gt;">MIT, with no account and no telemetry. A remote embedding provider receives text only after an explicit <code>allow_cloud</code>, and only from the paths in <code>include_paths</code>, which <code>obsidian.status</code> reports</p>
+        <p data-ru="MIT, без аккаунта и без телеметрии. Удалённый провайдер эмбеддингов получает текст только после явного &lt;code&gt;allow_cloud&lt;/code&gt; и только из путей &lt;code&gt;include_paths&lt;/code&gt;. Что ушло, видно в &lt;code&gt;obsidian.status&lt;/code&gt;">MIT, with no account and no telemetry. A remote embedding provider receives text only after an explicit <code>allow_cloud</code>, and only from the paths in <code>include_paths</code>, which <code>obsidian.status</code> reports</p>
       </div>
     </div>
   </section>

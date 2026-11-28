@@ -127,7 +127,7 @@
       <div class="section-head">
         <span class="kicker" data-ru="Запись">Writing</span>
         <h2 data-ru="Замена по ревизии, правка фрагмента, переименование">Replace at a revision, edit a fragment, rename</h2>
-        <p data-ru="Запись выключена по умолчанию. Во включаемом волте она сериализуется в один процесс и не обещает защиты от несохранённого буфера в Obsidian">Writing is off by default. In a writable vault it is serialized in one process, and it does not protect against an unsaved buffer in Obsidian</p>
+        <p data-ru="Запись выключена по умолчанию. Там, где она включена, правки идут через один процесс, но защиты от несохранённого буфера в Obsidian это не даёт">Writing is off by default. In a writable vault it is serialized in one process, and it does not protect against an unsaved buffer in Obsidian</p>
       </div>
       <div class="grid grid-3">
         <div class="card">
@@ -138,7 +138,7 @@
         <div class="card">
           <span class="sticker alt" data-ru="фрагмент">fragment</span>
           <h3 data-ru="Одно точное совпадение">One exact match</h3>
-          <p data-ru="&lt;code&gt;obsidian.update&lt;/code&gt; заменяет &lt;code&gt;old&lt;/code&gt; на &lt;code&gt;new&lt;/code&gt; там, где &lt;code&gt;old&lt;/code&gt; встречается ровно один раз. Два совпадения, в том числе перекрывающиеся, отказывают"><code>obsidian.update</code> replaces <code>old</code> with <code>new</code> where <code>old</code> occurs exactly once. Two matches, overlapping ones included, refuse the edit</p>
+          <p data-ru="&lt;code&gt;obsidian.update&lt;/code&gt; заменяет &lt;code&gt;old&lt;/code&gt; на &lt;code&gt;new&lt;/code&gt; в единственном месте, где &lt;code&gt;old&lt;/code&gt; встречается. Если совпадений два, в том числе перекрывающихся, правка отклоняется"><code>obsidian.update</code> replaces <code>old</code> with <code>new</code> where <code>old</code> occurs exactly once. Two matches, overlapping ones included, refuse the edit</p>
         </div>
         <div class="card">
           <span class="sticker quiet" data-ru="переименование">rename</span>
@@ -259,12 +259,12 @@
         <div class="card">
           <span class="num-sticker">01</span>
           <h3 data-ru="Инструкции по имени">Instructions by name</h3>
-          <p data-ru="&lt;code&gt;obsidian.agentsmd&lt;/code&gt; возвращает первый читаемый файл списка &lt;code&gt;instructions&lt;/code&gt;, по умолчанию &lt;code&gt;AGENTS.md&lt;/code&gt;, &lt;code&gt;GEMINI.md&lt;/code&gt;, &lt;code&gt;CLAUDE.md&lt;/code&gt;. Файл вне allowlist пропускается и не скрывает следующий"><code>obsidian.agentsmd</code> returns the first readable file of <code>instructions</code>, by default <code>AGENTS.md</code>, <code>GEMINI.md</code>, <code>CLAUDE.md</code>. A file outside the allowlist is skipped and never hides the next one</p>
+          <p data-ru="&lt;code&gt;obsidian.agentsmd&lt;/code&gt; возвращает первый читаемый файл из списка &lt;code&gt;instructions&lt;/code&gt;. По умолчанию это &lt;code&gt;AGENTS.md&lt;/code&gt;, затем &lt;code&gt;GEMINI.md&lt;/code&gt; и &lt;code&gt;CLAUDE.md&lt;/code&gt;. Файл вне allowlist пропускается и не скрывает следующий"><code>obsidian.agentsmd</code> returns the first readable file of <code>instructions</code>, by default <code>AGENTS.md</code>, <code>GEMINI.md</code>, <code>CLAUDE.md</code>. A file outside the allowlist is skipped and never hides the next one</p>
         </div>
         <div class="card">
           <span class="num-sticker">02</span>
           <h3 data-ru="Скиллы рядом с чужими">Skills beside the agent's own</h3>
-          <p data-ru="&lt;code&gt;obsidian.skills_list&lt;/code&gt; читает &lt;code&gt;.agents/skills&lt;/code&gt;, &lt;code&gt;obsidian.skill_read&lt;/code&gt; открывает &lt;code&gt;SKILL.md&lt;/code&gt; и справочные файлы внутри каталога скилла. Скиллы среды и скиллы волта не мешают друг другу"><code>obsidian.skills_list</code> reads <code>.agents/skills</code>, and <code>obsidian.skill_read</code> opens <code>SKILL.md</code> and the reference files inside the skill directory. The harness skills and the vault skills never collide</p>
+          <p data-ru="&lt;code&gt;obsidian.skills_list&lt;/code&gt; читает каталог &lt;code&gt;.agents/skills&lt;/code&gt;. &lt;code&gt;obsidian.skill_read&lt;/code&gt; открывает &lt;code&gt;SKILL.md&lt;/code&gt; и справочные файлы внутри каталога скилла. Скиллы среды и скиллы волта не мешают друг другу"><code>obsidian.skills_list</code> reads <code>.agents/skills</code>, and <code>obsidian.skill_read</code> opens <code>SKILL.md</code> and the reference files inside the skill directory. The harness skills and the vault skills never collide</p>
         </div>
         <div class="card">
           <span class="num-sticker">03</span>
@@ -280,7 +280,7 @@
       <div class="section-head">
         <span class="kicker" data-ru="Плагин">The plugin</span>
         <h2 data-ru="Ответ сервера внутри Obsidian">The server's answer, inside Obsidian</h2>
-        <p data-ru="Плагин не держит свой индекс и не редактирует заметки: он показывает то, что посчитал сервер, и прячет всё, чего сервер не предлагает">The plugin keeps no index of its own and edits no notes: it shows what the server computed and hides what the server does not offer</p>
+        <p data-ru="Плагин не держит свой индекс и не редактирует заметки. Он показывает то, что посчитал сервер, и прячет всё, чего сервер не предлагает">The plugin keeps no index of its own and edits no notes: it shows what the server computed and hides what the server does not offer</p>
       </div>
       <div class="grid grid-3">
         <div class="card">

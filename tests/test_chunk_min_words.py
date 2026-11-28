@@ -71,3 +71,33 @@ def test_min_chunk_words_must_be_an_integer_in_range(tmp_path, value):
     with pytest.raises(ValueError, match='min_chunk_words'):
         SearchIndex(Vault(tmp_path / 'vault', ['.']), dict(provider='ollama', model='synthetic',
                     dimensions=2, min_chunk_words=value), tmp_path)
+
+
+def test_related_names_the_section_when_a_selected_section_is_too_short(tmp_path, monkeypatch):
+    root = tmp_path / 'vault'
+    root.mkdir()
+    (root / 'note.md').write_text('# Long\n\n' + ' '.join(['word'] * 30) + '\n\n# Short\n\ntwo words\n')
+    monkeypatch.setattr(Embedder, 'embed', lambda self, text, operation: [1.0, 0.0])
+    index = SearchIndex(Vault(root, ['.']), dict(provider='ollama', model='synthetic', dimensions=2),
+                        tmp_path)
+    assert index.index('note.md')['chunks'] == 1
+    with pytest.raises(VaultError, match='selected section has no fragments of at least 24 words'):
+        index.related('note.md', 10, -1, section_line=5)
+
+
+def test_a_vector_written_as_json_is_packed_at_startup_and_a_broken_row_is_dropped(tmp_path):
+    import sqlite3
+    root = tmp_path / 'vault'
+    root.mkdir()
+    state = tmp_path / 'state'
+    state.mkdir(mode=0o700)
+    index = SearchIndex(Vault(root, ['.']), dict(provider='ollama', model='synthetic', dimensions=2), state)
+    assert index.embedder is not None
+    profile = index.embedder.profile
+    with sqlite3.connect(index.database) as db:
+        db.execute('INSERT INTO vectors VALUES (?, ?, ?)', (profile, 'old', '[1.0, 0.0]'))
+        db.execute('INSERT INTO vectors VALUES (?, ?, ?)', (profile, 'broken', 'not json'))
+    reopened = SearchIndex(Vault(root, ['.']), dict(provider='ollama', model='synthetic', dimensions=2), state)
+    with sqlite3.connect(reopened.database) as db:
+        rows = dict(db.execute('SELECT hash, typeof(vector) FROM vectors').fetchall())
+    assert rows == {'old': 'blob'}

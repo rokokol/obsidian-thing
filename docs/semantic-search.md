@@ -182,7 +182,7 @@ Each scheduled run checks the vault before it processes the queue. SQLite record
 
 `obsidian.query` treats the input as ordinary text, not FTS5 syntax. It searches for any of the query words. Underscores stay inside tokens, so a term such as `section_chunks` stays intact. The tokenizer does not reduce Russian words to their base forms
 
-The server ranks text results with BM25 and vector results with cosine similarity. It combines their ranks with reciprocal rank fusion. The returned `score` is a rank score, not a cosine similarity. The location comes from the result with the better rank. Text wins a tie
+The server ranks text results with BM25 and vector results with cosine similarity. It stores the vector of a query text, so a repeated query skips the provider. It combines their ranks with reciprocal rank fusion. The returned `score` is a rank score, not a cosine similarity. The location comes from the result with the better rank. Text wins a tie
 
 If the embedding provider fails, `obsidian.query` returns text matches and sets `vector_unavailable` to `true`. `obsidian.related` still uses only vectors, and its `score` remains a cosine similarity
 

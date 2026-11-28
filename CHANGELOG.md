@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Score neighbours with numpy over packed vectors and reuse the stored vector of a repeated query
 - Read the first readable instruction file of `AGENTS.md`, `GEMINI.md` and `CLAUDE.md` with `obsidian.agentsmd`, and set the order per vault
 - Rename each tool to the obsidian namespace, for example from `wiki.read` to `obsidian.read`
 - Make Canvas, Bases and Media Gallery optional per vault. Media Gallery is off by default

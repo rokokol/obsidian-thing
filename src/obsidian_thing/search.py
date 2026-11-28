@@ -5,7 +5,7 @@ import os
 import re
 import sqlite3
 import stat as stat_module
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable, Iterable, Sequence, Iterator
 from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from hashlib import sha256
@@ -15,12 +15,15 @@ from threading import Lock
 from time import monotonic
 from typing import NotRequired, TypedDict
 
+import numpy as np
 import regex
 
 from .embeddings import Embedder, EmbeddingDescription, EmbeddingError, SpendReport
 from .index_policy import ExclusionError, IndexPolicy
 from .metrics import Metrics
 from .projection import project
+
+_VECTOR = np.dtype('<f4')
 from .search_attachments import ATTACHMENT_LIMIT, SUFFIX_TYPES, TEXT_TYPES, attachment_parts, mime_type
 from .search_chunks import Chunk, chunks, section_lines
 from .search_metadata import fold, metadata_rows, tag_key
@@ -86,6 +89,16 @@ class Status(TypedDict):
     index: IndexStatus
     embeddings: NotRequired[EmbeddingStatus]
     spend: NotRequired[Spend]
+
+
+def _pack(vector: list[float]) -> bytes:
+    return np.asarray(vector, dtype=_VECTOR).tobytes()
+
+
+def _unpack(value: bytes | str) -> np.ndarray:
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        return np.frombuffer(value, dtype=_VECTOR)
+    return np.asarray(json.loads(value), dtype=_VECTOR)
 
 
 def _attachment_revision(stamp: str, data: bytes) -> str:
@@ -161,7 +174,7 @@ class SearchIndex:
             db.execute('PRAGMA journal_mode = WAL')
             db.executescript('''
                 CREATE TABLE IF NOT EXISTS vectors (
-                    profile TEXT, hash TEXT, vector TEXT NOT NULL, PRIMARY KEY (profile, hash)
+                    profile TEXT, hash TEXT, vector BLOB NOT NULL, PRIMARY KEY (profile, hash)
                 );
                 CREATE TABLE IF NOT EXISTS section_chunks (
                     profile TEXT, mode INTEGER, path TEXT, revision TEXT NOT NULL, hash TEXT NOT NULL,
@@ -204,6 +217,27 @@ class SearchIndex:
                     INSERT INTO lexical_fts (lexical_fts, rowid, text) VALUES ('delete', old.id, old.text);
                 END;
             ''')
+            self._pack_stored_vectors(db)
+
+    def _pack_stored_vectors(self, db: sqlite3.Connection) -> None:
+        # Vectors written before this format are JSON text; convert in batches so a large cache
+        # does not load at once, and drop a row that cannot be read because the cache refills itself
+        while True:
+            rows = db.execute("SELECT rowid, vector FROM vectors WHERE typeof(vector) = 'text' "
+                              "LIMIT 512").fetchall()
+            if not rows:
+                return
+            packed = []
+            broken = []
+            for rowid, value in rows:
+                try:
+                    packed.append((sqlite3.Binary(_pack(json.loads(value))), rowid))
+                except (TypeError, ValueError):
+                    broken.append((rowid,))
+            # Startup runs before the server serves a request, so the write lease is not needed
+            with db:
+                db.executemany('UPDATE vectors SET vector = ? WHERE rowid = ?', packed)
+                db.executemany('DELETE FROM vectors WHERE rowid = ?', broken)
 
     @contextmanager
     def _write(self, db: sqlite3.Connection) -> Iterator[None]:
@@ -288,7 +322,7 @@ class SearchIndex:
                               else embedder.embed_attachment(mime, payload, operation))
                     with self._write(db):
                         db.execute('INSERT OR IGNORE INTO vectors VALUES (?, ?, ?)',
-                                   (profile, digest, json.dumps(vector)))
+                                   (profile, digest, _pack(vector)))
             with self.local_lock, self._write(db):
                 if not self._is_current(path, revision):
                     raise VaultError('The file changed during indexing; try again')
@@ -517,15 +551,18 @@ class SearchIndex:
                             if len(edge['resolved']) == 1)
         source = self.index(path, operation='related', queued_revision=expected_revision)
         with closing(sqlite3.connect(self.database)) as db:
-            vectors = [json.loads(packed) for packed, in db.execute('''
+            vectors = [_unpack(packed) for packed, in db.execute('''
                 SELECT DISTINCT vector FROM section_chunks JOIN vectors USING (profile, hash)
                 WHERE profile = ? AND mode = ? AND path = ? AND revision = ?
                   AND (? IS NULL OR (line_end >= ? AND line_start <= ?))
             ''', (self.embedder.profile, self.section_chunks, path, source['revision'],
                   *((None, None, None) if bounds is None else (bounds[0], *bounds))))]
         if not vectors:
-            raise VaultError('The source has no fragments of at least '
-                             f'{self.min_chunk_words} words; lower min_chunk_words to index it')
+            if bounds is None:
+                raise VaultError('The source has no fragments of at least '
+                                 f'{self.min_chunk_words} words; lower min_chunk_words to index it')
+            raise VaultError('The selected section has no fragments of at least '
+                             f'{self.min_chunk_words} words; select a longer section or lower min_chunk_words')
         if not self._is_current(path, str(source['revision'])):
             raise VaultError('The source changed during related search; try again')
 
@@ -662,7 +699,7 @@ class SearchIndex:
             ''', (self.embedder.profile, self.section_chunks, *paths)).fetchall()
         sums: dict[str, list[float]] = {}
         for path, packed in rows:
-            vector = json.loads(packed)
+            vector = _unpack(packed)
             if len(vector) != self.embedder.dimensions:
                 raise VaultError('The vector index holds a vector of an unexpected size')
             total = sums.setdefault(path, [0.0] * len(vector))
@@ -750,10 +787,21 @@ class SearchIndex:
             raise VaultError('Use a short non-empty text query without NUL characters')
         if self.embedder is None:
             return {'matches': _merge_ranks(self._lexical(text, limit))}
-        try:
-            vectors = [self.embedder.embed(text, 'query')]
-        except EmbeddingError:
-            return {'matches': _merge_ranks(self._lexical(text, limit)), 'vector_unavailable': True}
+        digest = sha256(text.encode()).hexdigest()
+        profile = self.embedder.profile
+        with closing(sqlite3.connect(self.database)) as db:
+            cached = db.execute('SELECT vector FROM vectors WHERE profile = ? AND hash = ?',
+                                (profile, digest)).fetchone()
+        if cached is not None:
+            vector = _unpack(cached[0])
+        else:
+            try:
+                vector = self.embedder.embed(text, 'query')
+            except EmbeddingError:
+                return {'matches': _merge_ranks(self._lexical(text, limit)), 'vector_unavailable': True}
+            with closing(sqlite3.connect(self.database)) as db, self._write(db):
+                db.execute('INSERT OR IGNORE INTO vectors VALUES (?, ?, ?)', (profile, digest, _pack(vector)))
+        vectors = [vector]
         lexical = self._lexical(text, self.max_results)
         semantic = self._match(self.embedder.profile, vectors, self.max_results, -1)['matches']
         return {'matches': _merge_ranks(lexical, semantic)[:limit]}
@@ -796,31 +844,29 @@ class SearchIndex:
                     break
         return hits
 
-    def _match(self, profile: str, vectors: list[list[float]], limit: int, min_score: float,
+    def _match(self, profile: str, vectors: Sequence[Sequence[float] | np.ndarray], limit: int,
+               min_score: float,
                *, accepts: Callable[[str], bool] | None = None, group_sections: bool = False) -> Matches:
         if not vectors:
             return {'matches': []}
+        source = np.asarray(vectors, dtype=_VECTOR)
         best: dict[tuple[str, str], Match] = {}
         sections: dict[tuple[str, str], list[SectionMatch]] = {}
-        with closing(sqlite3.connect(self.database)) as db:
-            for path, revision, packed, headings, start, end, ordinal in db.execute('''
-                SELECT path, revision, vector, headings, line_start, line_end, ordinal
-                FROM section_chunks JOIN vectors USING (profile, hash)
-                WHERE profile = ? AND mode = ? ORDER BY path, ordinal
-            ''', (profile, self.section_chunks)):
-                if accepts is not None and not accepts(path):
-                    continue
-                vector = json.loads(packed)
-                score = max(math.fsum(x * y for x, y in zip(source, vector, strict=True)) for source in vectors)
+        batch: list[tuple[str, str, np.ndarray, str, int | None, int | None, int]] = []
+
+        def score_batch() -> None:
+            matrix = np.vstack([item[2] for item in batch])
+            scores = (matrix @ source.T).max(axis=1)
+            for (path, revision, _, headings, start, end, ordinal), value in zip(batch, scores, strict=True):
+                score = max(-1.0, min(1.0, float(value)))
                 key = path, revision
-                score = max(-1, min(1, score))
                 if score < min_score:
                     continue
                 is_best = key not in best or score > best[key]['score']
                 if not group_sections and not is_best:
                     continue
                 location: SectionMatch = {'score': score}
-                if start is not None:
+                if start is not None and end is not None:
                     location.update(headings=json.loads(headings), line_start=start, line_end=end)
                 elif mime_type(path) == 'application/pdf':
                     location['page'] = ordinal + 1
@@ -837,6 +883,21 @@ class SearchIndex:
                     if 'page' in location:
                         hit['page'] = location['page']
                     best[key] = hit
+            batch.clear()
+
+        with closing(sqlite3.connect(self.database)) as db:
+            for path, revision, packed, headings, start, end, ordinal in db.execute('''
+                SELECT path, revision, vector, headings, line_start, line_end, ordinal
+                FROM section_chunks JOIN vectors USING (profile, hash)
+                WHERE profile = ? AND mode = ? ORDER BY path, ordinal
+            ''', (profile, self.section_chunks)):
+                if accepts is not None and not accepts(path):
+                    continue
+                batch.append((path, revision, _unpack(packed), headings, start, end, ordinal))
+                if len(batch) >= 2048:
+                    score_batch()
+        if batch:
+            score_batch()
         hits: list[Match] = []
         for (path, revision), hit in sorted(best.items(), key=lambda item: (-item[1]['score'], item[0][0])):
             if len(hits) == limit:

@@ -1474,36 +1474,6 @@ class MapView extends ItemView {
         "aria-label": `Neighborhood map of ${this.path} with ${result.points.length - 1} neighbors. Use the file list for keyboard access.`,
       },
     });
-    if (minX <= 0 && maxX >= 0) {
-      svg.createSvg("line", {
-        cls: "thing-map-axis",
-        attr: { x1: px(0), y1: pad, x2: px(0), y2: height - pad },
-      });
-    }
-    if (minY <= 0 && maxY >= 0) {
-      svg.createSvg("line", {
-        cls: "thing-map-axis",
-        attr: { x1: pad, y1: py(0), x2: width - pad, y2: py(0) },
-      });
-    }
-    svg
-      .createSvg("text", {
-        cls: "thing-map-axis-label",
-        attr: { x: width / 2, y: height - 12, "text-anchor": "middle" },
-      })
-      .setText("Principal component 1");
-    svg
-      .createSvg("text", {
-        cls: "thing-map-axis-label",
-        attr: {
-          x: 14,
-          y: height / 2,
-          "text-anchor": "middle",
-          transform: `rotate(-90 14 ${height / 2})`,
-        },
-      })
-      .setText("Principal component 2");
-
     const ordered = [...result.points].sort((a, b) => Number(Boolean(a.source)) - Number(Boolean(b.source)));
     for (const point of ordered) {
       const circle = svg.createSvg("circle", {

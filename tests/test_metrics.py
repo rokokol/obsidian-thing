@@ -67,7 +67,7 @@ def test_metrics_count_provider_calls_cache_and_mcp_errors(tmp_path, monkeypatch
         for _ in range(2):
             call('tools/call', {'name': 'obsidian.index', 'arguments': {'path': 'private-path.md'}})
         for _ in range(2):
-            call('tools/call', {'name': 'obsidian.query', 'arguments': {'text': 'private text'}})
+            call('tools/call', {'name': 'obsidian.query', 'arguments': {'text': 'another query'}})
         assert call('tools/call', {'name': 'private-tool', 'arguments': {}})['result']['isError']
         assert 'error' in call('private-method', {})
         response = client.get('/metrics', headers={'Authorization': 'Bearer metrics-test-token'})

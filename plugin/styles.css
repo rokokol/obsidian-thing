@@ -349,15 +349,7 @@
   background: var(--background-secondary);
 }
 
-.thing-map-axis {
-  stroke: var(--background-modifier-border);
-  stroke-width: 1;
-}
 
-.thing-map-axis-label {
-  fill: var(--text-faint);
-  font-size: 11px;
-}
 
 .thing-map-point {
   fill: var(--interactive-accent);

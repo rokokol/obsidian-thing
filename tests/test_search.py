@@ -143,9 +143,9 @@ def test_query_combines_exact_and_semantic_matches_and_falls_back(tmp_path, monk
     assert result.get('vector_unavailable') is True
     assert [hit['path'] for hit in result['matches']] == ['z-exact.md']
     restricted = SearchIndex(Vault(root, ['a-semantic.md']), config, state)
-    assert restricted.query('section_chunks', 10)['matches'] == []
+    assert restricted.query('section_chunks offline', 10)['matches'] == []
     exact.write_text('Changed.')
-    assert index.query('section_chunks', 10)['matches'] == []
+    assert index.query('section_chunks changed', 10)['matches'] == []
     exact.write_text('FTS works without a model.')
     with pytest.raises(EmbeddingError):
         index.index('z-exact.md')

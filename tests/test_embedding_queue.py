@@ -1,8 +1,10 @@
 import sqlite3
+from concurrent.futures import ThreadPoolExecutor, wait
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from threading import Event
 
+import pytest
 from starlette.testclient import TestClient
 
 from obsidian_thing.embedding_schedule import EmbeddingSchedule
@@ -108,15 +110,74 @@ def test_queue_retains_failed_work_and_manual_index_drains_it(tmp_path: Path, mo
     index = SearchIndex(Vault(root, ['.']), config, state)
     index.reconcile_local()
 
+    error = EmbeddingError('offline')
+
     def offline(self, text, operation):
-        raise EmbeddingError('offline')
+        raise error
 
     monkeypatch.setattr(Embedder, 'embed', offline)
+    with pytest.raises(EmbeddingError) as caught:
+        index.index('note.md')
+    assert caught.value is error
     assert not index.run_pending()
     assert [path for path, _ in index.pending()] == ['note.md']
     monkeypatch.setattr(Embedder, 'embed', lambda self, text, operation: [1.0, 0.0])
     index.index('note.md')
     assert index.pending() == []
+
+
+def test_manual_index_writes_when_background_scan_holds_sqlite_transaction(tmp_path, monkeypatch):
+    root = tmp_path / 'vault'
+    root.mkdir()
+    state = tmp_path / 'state'
+    state.mkdir(mode=0o700)
+    (root / 'manual.md').write_text('manual text')
+    (root / 'scan.md').write_text('scan text')
+    config = dict(provider='ollama', model='synthetic', dimensions=2)
+    manual = SearchIndex(Vault(root, ['.']), config, state)
+    background = SearchIndex(Vault(root, ['.']), config, state)
+    provider_started = Event()
+    scan_writes = Event()
+    release_scan = Event()
+    connect = sqlite3.connect
+
+    def trace(sql):
+        if sql.startswith('DELETE FROM lexical_chunks') and "'scan.md'" in sql:
+            scan_writes.set()
+            release_scan.wait(10)
+
+    def connect_without_busy_wait(*args, **kwargs):
+        db = connect(*args, **(kwargs | {'timeout': 0}))
+        db.set_trace_callback(trace)
+        return db
+
+    def embed(self, text, operation):
+        if operation == 'index':
+            provider_started.set()
+            assert scan_writes.wait(5)
+        return [1.0, 0.0]
+
+    monkeypatch.setattr(sqlite3, 'connect', connect_without_busy_wait)
+    monkeypatch.setattr(Embedder, 'embed', embed)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        indexing = pool.submit(manual.index, 'manual.md')
+        try:
+            assert provider_started.wait(5)
+            scanning = pool.submit(background.reconcile_local)
+            assert scan_writes.wait(5)
+            with pytest.raises(sqlite3.OperationalError) as caught, connect(manual.database, timeout=0) as probe:
+                probe.execute('BEGIN IMMEDIATE')
+            assert caught.value.sqlite_errorcode == sqlite3.SQLITE_BUSY
+            wait([indexing], timeout=0.5)
+        finally:
+            release_scan.set()
+        assert indexing.result(5)['chunks'] == 1
+        assert set(scanning.result(5)) == {'manual.md', 'scan.md'}
+
+    assert background.run_pending()
+    assert background.pending() == []
+    with connect(manual.database) as db:
+        assert {path for path, in db.execute('SELECT path FROM section_chunks')} == {'manual.md', 'scan.md'}
 
 
 def test_http_lifespan_runs_enabled_schedule(tmp_path: Path, monkeypatch):

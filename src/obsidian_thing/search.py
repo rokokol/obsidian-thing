@@ -5,8 +5,8 @@ import os
 import re
 import sqlite3
 import stat as stat_module
-from collections.abc import Callable, Iterable
-from contextlib import closing
+from collections.abc import Callable, Iterable, Iterator
+from contextlib import closing, contextmanager
 from datetime import datetime, timezone
 from hashlib import sha256
 from itertools import islice
@@ -147,11 +147,12 @@ class SearchIndex:
         if self.embedder and not self.embedder.local and self.embedder.can_send and not self.include:
             raise ValueError('Configure include_paths before you send files to a remote embedding endpoint')
         self.database = state / 'search.sqlite3'
+        self.write_lock_path = state / 'search-write.lock'
         self.embedding_lock_path = state / 'embedding.lock'
         self.run_lock_path = state / 'embedding-run.lock'
         self.index_lock = Lock()
         self.local_lock = Lock()
-        with closing(sqlite3.connect(self.database)) as db, db:
+        with closing(sqlite3.connect(self.database)) as db, self._write(db):
             db.execute('PRAGMA journal_mode = WAL')
             db.executescript('''
                 CREATE TABLE IF NOT EXISTS vectors (
@@ -198,6 +199,12 @@ class SearchIndex:
                     INSERT INTO lexical_fts (lexical_fts, rowid, text) VALUES ('delete', old.id, old.text);
                 END;
             ''')
+
+    @contextmanager
+    def _write(self, db: sqlite3.Connection) -> Iterator[None]:
+        with self.write_lock_path.open('ab') as lease, db:
+            fcntl.flock(lease, fcntl.LOCK_EX)
+            yield
 
     @staticmethod
     def _supports_text(path: str) -> bool:
@@ -273,10 +280,10 @@ class SearchIndex:
                         raise VaultError('The file changed or left the index scope during indexing')
                     vector = (embedder.embed(payload, operation) if isinstance(payload, str)
                               else embedder.embed_attachment(mime, payload, operation))
-                    with db:
+                    with self._write(db):
                         db.execute('INSERT OR IGNORE INTO vectors VALUES (?, ?, ?)',
                                    (profile, digest, json.dumps(vector)))
-            with self.local_lock, db:
+            with self.local_lock, self._write(db):
                 if not self._is_current(path, revision):
                     raise VaultError('The file changed during indexing; try again')
                 db.execute('DELETE FROM section_chunks WHERE profile = ? AND mode = ? AND path = ?',
@@ -391,8 +398,8 @@ class SearchIndex:
                             if not row or row[0] != revision:
                                 for _ in attachment_parts(mime, data):
                                     pass
-                                self._drop_path(db, path)
-                                with db:
+                                with self._write(db):
+                                    self._delete_path(db, path)
                                     db.execute('INSERT INTO local_files VALUES (?, ?, ?)',
                                                (self.section_chunks, path, revision))
                             revisions[path] = revision
@@ -425,20 +432,23 @@ class SearchIndex:
             if full_scan and completed:
                 indexed, embedded = self._coverage_counts(db, candidates)
                 profile = self.embedder.profile if self.embedder is not None else ''
-                with db:
+                with self._write(db):
                     db.execute('INSERT OR REPLACE INTO coverage VALUES (?, ?, ?, ?, ?, ?, ?)', (
                         self.section_chunks, profile, len(candidates), excluded, indexed, embedded,
                         datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')))
             return revisions
 
+    def _drop_path(self, db: sqlite3.Connection, path: str) -> None:
+        with self._write(db):
+            self._delete_path(db, path)
+
     @staticmethod
-    def _drop_path(db: sqlite3.Connection, path: str) -> None:
-        with db:
-            db.execute('DELETE FROM local_files WHERE path = ?', (path,))
-            db.execute('DELETE FROM embedded_files WHERE path = ?', (path,))
-            db.execute('DELETE FROM lexical_chunks WHERE path = ?', (path,))
-            db.execute('DELETE FROM note_metadata WHERE path = ?', (path,))
-            db.execute('DELETE FROM section_chunks WHERE path = ?', (path,))
+    def _delete_path(db: sqlite3.Connection, path: str) -> None:
+        db.execute('DELETE FROM local_files WHERE path = ?', (path,))
+        db.execute('DELETE FROM embedded_files WHERE path = ?', (path,))
+        db.execute('DELETE FROM lexical_chunks WHERE path = ?', (path,))
+        db.execute('DELETE FROM note_metadata WHERE path = ?', (path,))
+        db.execute('DELETE FROM section_chunks WHERE path = ?', (path,))
 
     def _lexical_is_current(self, db: sqlite3.Connection, path: str, revision: str) -> bool:
         return db.execute('''
@@ -452,10 +462,10 @@ class SearchIndex:
         key = self.section_chunks, path
         if self._lexical_is_current(db, path, revision):
             return
-        if not self._is_current(path, revision, local=True):
-            raise VaultError('The file changed during indexing; try again')
         rows = metadata_rows(note['content']) if mime_type(path) == 'text/markdown' else ()
-        with db:
+        with self._write(db):
+            if not self._is_current(path, revision, local=True):
+                raise VaultError('The file changed during indexing; try again')
             db.execute('DELETE FROM note_metadata WHERE mode = ? AND path = ?', key)
             db.executemany('INSERT INTO note_metadata VALUES (?, ?, ?, ?, ?)', ((*key, *row) for row in rows))
             db.execute('DELETE FROM lexical_chunks WHERE mode = ? AND path = ?', key)

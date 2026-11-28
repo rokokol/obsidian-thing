@@ -4,7 +4,9 @@ import os
 import sqlite3
 import time
 from base64 import b64encode
+from collections.abc import Iterable
 from contextlib import closing
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 from http.client import HTTPException
@@ -13,8 +15,41 @@ from urllib.parse import urlsplit
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 
+from typing import TypedDict
+
 from .metrics import Metrics
 from .search_attachments import ATTACHMENT_TYPES, MEDIA_FORMATS, _validate_media
+
+
+class EmbeddingDescription(TypedDict):
+    provider: str
+    model: str
+    dimensions: int
+    profile: str
+    remote: bool
+    can_send: bool
+    daily_budget_usd: str | None
+
+
+class CostTotals(TypedDict):
+    calls: int
+    reported: str
+    estimated: str
+    unknown_calls: int
+    local_calls: int
+
+
+class SpendPeriod(CostTotals):
+    name: str
+
+
+class SpendDay(CostTotals):
+    date: str
+
+
+class SpendReport(TypedDict):
+    periods: list[SpendPeriod]
+    daily: list[SpendDay]
 
 
 class EmbeddingError(ValueError):
@@ -24,6 +59,24 @@ class EmbeddingError(ValueError):
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
+
+
+def totals(rows: Iterable[tuple[str, str, str | None]]) -> CostTotals:
+    reported = estimated = Decimal(0)
+    calls = unknown = local = 0
+    for _, kind, usd in rows:
+        calls += 1
+        if kind in ('reported', 'estimated') and usd is not None:
+            if kind == 'reported':
+                reported += Decimal(usd)
+            else:
+                estimated += Decimal(usd)
+        elif kind == 'local':
+            local += 1
+        else:
+            unknown += 1
+    return {'calls': calls, 'reported': str(reported), 'estimated': str(estimated),
+            'unknown_calls': unknown, 'local_calls': local}
 
 
 def _money(value):
@@ -79,12 +132,14 @@ class Embedder:
         if not isinstance(provider, str):
             raise ValueError('Select ollama, openrouter, openai, or lm_studio for embeddings')
         self.provider = provider
-        self.model = config.get('model')
-        self.dimensions = config.get('dimensions')
-        if not isinstance(self.model, str) or not self.model.strip():
+        model = config.get('model')
+        dimensions = config.get('dimensions')
+        if not isinstance(model, str) or not model.strip():
             raise ValueError('Configure an embedding model')
-        if type(self.dimensions) is not int or not 1 <= self.dimensions <= 8192:
+        if type(dimensions) is not int or not 1 <= dimensions <= 8192:
             raise ValueError('Configure embedding dimensions between 1 and 8192')
+        self.model: str = model
+        self.dimensions: int = dimensions
         self.rate = _money(config.get('usd_per_million_tokens'))
         if 'usd_per_million_tokens' in config and self.rate is None:
             raise ValueError('Configure a valid USD token rate')
@@ -193,6 +248,38 @@ class Embedder:
                     status = ?, cost_kind = ?, usd = ? WHERE id = ?''', (*values, reservation))
         if self.metrics is not None:
             self.metrics.record_provider(operation, self.provider, status, elapsed, kind, cost)
+
+    periods = (('24h', timedelta(hours=24)), ('7d', timedelta(days=7)), ('30d', timedelta(days=30)))
+    spend_days = 30
+
+    def description(self) -> EmbeddingDescription:
+        return {
+            'provider': self.provider,
+            'model': self.model,
+            'dimensions': self.dimensions,
+            'profile': self.profile[:12],
+            'remote': not self.local,
+            'can_send': self.can_send,
+            'daily_budget_usd': None if self.daily_budget is None else str(self.daily_budget),
+        }
+
+    def spend_report(self) -> SpendReport:
+        now = datetime.now(timezone.utc)
+        with closing(sqlite3.connect(self.journal)) as db:
+            rows = db.execute('SELECT at, cost_kind, usd FROM calls ORDER BY at').fetchall()
+        periods: list[SpendPeriod] = []
+        for name, age in (*self.periods, ('all', None)):
+            cutoff = None if age is None else (now - age).strftime('%Y-%m-%d %H:%M:%S')
+            periods.append({'name': name, **totals(row for row in rows if cutoff is None or row[0] >= cutoff)})
+        cutoff = (now - timedelta(days=self.spend_days)).strftime('%Y-%m-%d %H:%M:%S')
+        daily: dict[str, list[tuple[str, str, str | None]]] = {}
+        for at, kind, usd in rows:
+            if at >= cutoff:
+                daily.setdefault(at[:10], []).append((at, kind, usd))
+        days: list[SpendDay] = []
+        for day, day_rows in sorted(daily.items()):
+            days.append({'date': day, **totals(day_rows)})
+        return {'periods': periods, 'daily': days}
 
     def supports_attachment(self, mime: str) -> bool:
         return (self.provider == 'openrouter' and self.model == 'google/gemini-embedding-2'

@@ -1,19 +1,23 @@
 import fcntl
 import json
 import math
+import os
 import re
 import sqlite3
+import stat as stat_module
 from collections.abc import Callable, Iterable
 from contextlib import closing
+from datetime import datetime, timezone
 from hashlib import sha256
 from itertools import islice
 from pathlib import Path
 from threading import Lock
 from typing import NotRequired, TypedDict
 
-from .embeddings import Embedder, EmbeddingError
-from .index_policy import IndexPolicy
+from .embeddings import Embedder, EmbeddingDescription, EmbeddingError, SpendReport
+from .index_policy import ExclusionError, IndexPolicy
 from .metrics import Metrics
+from .projection import project
 from .search_attachments import ATTACHMENT_LIMIT, SUFFIX_TYPES, TEXT_TYPES, attachment_parts, mime_type
 from .search_chunks import Chunk, chunks, section_lines
 from .vault import TextFile, Vault, VaultError, _parts
@@ -35,6 +39,46 @@ class Match(SectionMatch):
 class Matches(TypedDict):
     matches: list[Match]
     vector_unavailable: NotRequired[bool]
+
+
+class MapPoint(TypedDict):
+    path: str
+    x: float
+    y: float
+    score: float
+    source: NotRequired[bool]
+
+
+class Map(TypedDict):
+    points: list[MapPoint]
+    explained: list[float]
+    dimensions: int
+
+
+class IndexStatus(TypedDict):
+    mode: str
+    files: int
+    excluded: int
+    indexed: int
+    unindexed: int
+    embedded: int
+    pending: int
+    last_full_scan: str | None
+
+
+class EmbeddingStatus(EmbeddingDescription):
+    related_min_score: float
+    allowed_mime_types: list[str]
+
+
+class Spend(SpendReport):
+    pass
+
+
+class Status(TypedDict):
+    index: IndexStatus
+    embeddings: NotRequired[EmbeddingStatus]
+    spend: NotRequired[Spend]
 
 
 def _attachment_revision(stamp: str, data: bytes) -> str:
@@ -119,6 +163,9 @@ class SearchIndex:
                 CREATE TABLE IF NOT EXISTS embedded_files (
                     profile TEXT NOT NULL, mode INTEGER NOT NULL, path TEXT NOT NULL, revision TEXT NOT NULL,
                     PRIMARY KEY (profile, mode, path)
+                );
+                CREATE TABLE IF NOT EXISTS meta (
+                    key TEXT PRIMARY KEY, value TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS lexical_chunks (
                     id INTEGER PRIMARY KEY, mode INTEGER NOT NULL, path TEXT NOT NULL,
@@ -283,6 +330,7 @@ class SearchIndex:
     def reconcile_local(self, paths: Iterable[str] | None = None, *,
                         stop: Callable[[], bool] | None = None) -> dict[str, str]:
         full_scan = paths is None
+        completed = True
         with closing(sqlite3.connect(self.database)) as db:
             if paths is None:
                 visible = set(self.vault.visible_files())
@@ -295,6 +343,7 @@ class SearchIndex:
             revisions = {}
             for path in sorted(set(paths)):
                 if stop is not None and stop():
+                    completed = False
                     break
                 if not self._supports_text(path):
                     self.vault.graph.refresh(path)
@@ -339,6 +388,10 @@ class SearchIndex:
                         revisions[path] = revision
                     except VaultError:
                         self._drop_path(db, path)
+            if full_scan and completed:
+                with db:
+                    db.execute('INSERT OR REPLACE INTO meta VALUES (?, ?)', (
+                        'last_full_scan', datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')))
             return revisions
 
     @staticmethod
@@ -421,6 +474,136 @@ class SearchIndex:
             return any(parts[:len(prefix)] == prefix for prefix in prefixes)
 
         return self._match(self.embedder.profile, vectors, limit, threshold, accepts=accepts, group_sections=True)
+
+    def status(self) -> Status:
+        files, excluded = self._candidates()
+        with closing(sqlite3.connect(self.database)) as db:
+            local = {path for path, in db.execute(
+                'SELECT path FROM local_files WHERE mode = ?', (self.section_chunks,))}
+            embedded = set()
+            if self.embedder is not None:
+                embedded = {path for path, in db.execute('''
+                    SELECT e.path FROM embedded_files AS e
+                    WHERE e.profile = ? AND e.mode = ? AND EXISTS (
+                        SELECT 1 FROM section_chunks AS c
+                        WHERE c.profile = e.profile AND c.mode = e.mode AND c.path = e.path
+                          AND c.revision = e.revision
+                    )
+                ''', (self.embedder.profile, self.section_chunks))}
+            last, = db.execute("SELECT value FROM meta WHERE key = 'last_full_scan'").fetchone() or (None,)
+        candidates = set(files)
+        report: Status = {'index': {
+            'mode': 'sections' if self.section_chunks else 'size',
+            'files': len(files),
+            'excluded': excluded,
+            'indexed': len(candidates & local),
+            'unindexed': len(candidates - local),
+            'embedded': len(candidates & embedded),
+            'pending': self._queued(),
+            'last_full_scan': last,
+        }}
+        if self.embedder is not None:
+            report['embeddings'] = {
+                **self.embedder.description(),
+                'related_min_score': self.related_min_score,
+                'allowed_mime_types': sorted(self.allowed_mime_types),
+            }
+            report['spend'] = self.embedder.spend_report()
+        return report
+
+    def _in_scope(self, parts: tuple[str, ...]) -> bool:
+        if self.include and not any(parts[:len(prefix)] == prefix for prefix in self.include):
+            return False
+        return not any(parts[:len(prefix)] == prefix for prefix in self.exclude)
+
+    def _size(self, path: str) -> int | None:
+        # visible_files already rejects symlinks; lstat keeps a stale queue row from following one
+        try:
+            info = os.lstat(self.vault.root / path)
+        except OSError:
+            return None
+        return info.st_size if stat_module.S_ISREG(info.st_mode) else None
+
+    def _candidates(self) -> tuple[list[str], int]:
+        # An attachment joins the count only when the provider can send its bytes
+        can_embed = self.embedder is not None and self.embedder.can_send
+        files: list[str] = []
+        excluded = 0
+        for path in self.vault.visible_files():
+            mime = mime_type(path)
+            text = mime in TEXT_TYPES
+            if not text and not (can_embed and mime in self.allowed_mime_types
+                                 and self._in_scope(_parts(path))):
+                continue
+            try:
+                self.policy.check(path)
+            except ExclusionError:
+                excluded += 1
+                continue
+            size = self._size(path)
+            limit = self.vault.max_read_bytes if text else ATTACHMENT_LIMIT
+            if size is None or size > limit or (not text and not size):
+                continue
+            files.append(path)
+        return files, excluded
+
+    def _queued(self) -> int:
+        # The worker drops files outside the embedding scope, and reading them would make a status call expensive
+        if self.embedder is None or not self.embedder.can_send:
+            return 0
+        count = 0
+        with closing(sqlite3.connect(self.database)) as db:
+            for path, _ in db.execute(self._pending_rows, (self.section_chunks, self.embedder.profile)):
+                try:
+                    self._check_path(path)
+                except VaultError:
+                    continue
+                if self._size(path) is None:
+                    continue
+                count += 1
+        return count
+
+    def map(self, path: str, limit: int = 10, min_score: float | None = None, *,
+            section_line: int | None = None, include_paths: list[str] | None = None,
+            mime_types: list[str] | None = None, exclude_linked: bool = False) -> Map:
+        if self.embedder is None:
+            raise VaultError('Enable embeddings to draw a similarity map')
+        result = self.related(path, limit, min_score, section_line=section_line, include_paths=include_paths,
+                              mime_types=mime_types, exclude_linked=exclude_linked)
+        matches = {match['path']: match for match in result['matches']}
+        try:
+            coordinates, explained = project(self._centroids([path, *matches]))
+        except ValueError:
+            raise VaultError('The vectors of these files cannot form a map') from None
+        x, y = coordinates.get(path, (0.0, 0.0))
+        points: list[MapPoint] = [{'path': path, 'x': x, 'y': y, 'score': 1.0, 'source': True}]
+        for target, match in matches.items():
+            x, y = coordinates.get(target, (0.0, 0.0))
+            points.append({'path': target, 'x': x, 'y': y, 'score': match['score']})
+        return {'points': points, 'explained': explained, 'dimensions': self.embedder.dimensions}
+
+    def _centroids(self, paths: list[str]) -> dict[str, list[float]]:
+        assert self.embedder is not None
+        placeholders = ', '.join('?' * len(paths))
+        with closing(sqlite3.connect(self.database)) as db:
+            rows = db.execute(f'''
+                SELECT path, vector FROM section_chunks JOIN vectors USING (profile, hash)
+                WHERE profile = ? AND mode = ? AND path IN ({placeholders})
+            ''', (self.embedder.profile, self.section_chunks, *paths)).fetchall()
+        sums: dict[str, list[float]] = {}
+        for path, packed in rows:
+            vector = json.loads(packed)
+            if len(vector) != self.embedder.dimensions:
+                raise VaultError('The vector index holds a vector of an unexpected size')
+            total = sums.setdefault(path, [0.0] * len(vector))
+            for index, value in enumerate(vector):
+                total[index] += value
+        centroids = {}
+        for path, total in sums.items():
+            length = math.hypot(*total)
+            if length:
+                centroids[path] = [value / length for value in total]
+        return centroids
 
     def query(self, text: str, limit: int) -> Matches:
         self._validate_limit(limit)

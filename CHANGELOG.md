@@ -4,7 +4,7 @@
 
 ### Changed
 
-- Rename every tool from `wiki.*` to `obsidian.*`
+- Rename each tool to the obsidian namespace, for example from `wiki.read` to `obsidian.read`
 - Make Canvas, Bases and Media Gallery optional per vault. Media Gallery is off by default
 
 ### Added
@@ -30,6 +30,8 @@
 - Ship an example checker in `examples/`
 - Index Markdown and plain text for semantic search with Ollama or opt-in OpenRouter
 - Record embedding calls and USD costs in a separate SQLite journal
+- Report index coverage, the embedding queue, the last full scan, the model profile and recorded costs with `obsidian.status`
+- Draw a file and its nearest neighbours on two axes with `obsidian.map`, ranked in the vector space and not by the drawn position
 
 ## [0.1.0] - 2026-11-19
 

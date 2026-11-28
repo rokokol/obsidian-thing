@@ -26,7 +26,7 @@ from .index_policy import IndexPolicy
 from .index_watcher import IndexWatcher
 from .metrics import Metrics
 from .rules import KNOWN_CHECKS, QUOTE_KEYS, _quote_pair
-from .search import Matches, SearchIndex
+from .search import Map, Matches, SearchIndex, Status
 from .structured_documents import BaseChange, CanvasChange
 from .vault import FileInfo, MutationResult, RenamedFile, TextFile, TrashedFile, Vault, VaultError
 
@@ -205,6 +205,15 @@ def vault_server(
             with _tool_errors():
                 return search.query(text, limit)
 
+        @server.tool(name='obsidian.status', description=(
+            'Report index coverage, the pending embedding queue, the last full scan, the embedding model '
+            'profile, and recorded costs by period and by day. Omit embeddings and costs when this vault '
+            'has no embedding profile.'
+        ))
+        def status() -> Status:
+            with _tool_errors():
+                return search.status()
+
         if vectors:
             @server.tool(name='obsidian.related', description=(
                 'Find indexed neighbors of a text file or an enabled attachment. '
@@ -217,6 +226,19 @@ def vault_server(
                 with _tool_errors():
                     return search.related(path, limit, min_score, section_line=section_line, include_paths=include_paths,
                                           mime_types=mime_types, exclude_linked=exclude_linked)
+
+            @server.tool(name='obsidian.map', description=(
+                'Draw a text file or an enabled attachment and its nearest indexed neighbours on two axes. '
+                'Rank the neighbours by their vectors, not by the drawn coordinates. '
+                'Filter results by vault-relative paths, MIME types, or outgoing links.'
+            ))
+            def layout(path: str, limit: int = 10, min_score: float | None = None,
+                       section_line: int | None = None, include_paths: list[str] | None = None,
+                       mime_types: list[str] | None = None, exclude_linked: bool = False) -> Map:
+                with _tool_errors():
+                    return search.map(path, limit, min_score, section_line=section_line,
+                                      include_paths=include_paths, mime_types=mime_types,
+                                      exclude_linked=exclude_linked)
 
     return server
 

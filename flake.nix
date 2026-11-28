@@ -49,6 +49,7 @@
               markdown-it-py
               mcp
               mdit-py-plugins
+              numpy
               pillow
               pypdf
               prometheus-client
@@ -62,7 +63,10 @@
               ":"
               (lib.makeBinPath (with pkgs; [ ffmpeg-headless ]))
             ];
-            pythonImportsCheck = [ "obsidian_thing.server" ];
+            pythonImportsCheck = [
+              "obsidian_thing.server"
+              "obsidian_thing.projection"
+            ];
             meta = {
               description = "MCP server for local Obsidian vaults";
               mainProgram = "obsidian-thing";

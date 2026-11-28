@@ -98,6 +98,36 @@ The path and MIME filters apply only to results. They do not extend the vault or
 
 Each file appears once, with its best score and location. The `sections` list contains matching text fragments or PDF pages in score order. Image, audio and video matches have no section locations. If you select a source section, the server can index missing chunks of the whole source file. Only vectors from the selected section contribute to the search
 
+## Neighbourhood map
+
+`obsidian.map` draws the source file and its nearest neighbours on two axes. The source can be a text file or an enabled attachment. It takes the same arguments as `obsidian.related`, including `limit`, and returns the same files in the same rank order. The `score` of a point is the cosine similarity that `obsidian.related` reports, so a short list is still ranked in the full vector space and never by the drawn position
+
+The server reduces the file vectors with a principal component analysis. The mean vector of each file gives its point, so the position summarises a file rather than ranks it. `explained` gives the share of variance that each axis keeps. Coordinates fit a square from −1 to 1 and share one scale, so a drawn distance stays comparable to the distance it stands for. The same vectors always produce the same points, and the largest element of an axis fixes its sign, so a change of the linear algebra library cannot mirror a map. A file whose vectors cancel out sits at the origin
+
+The tool needs an embedding profile. A vault with only full-text search does not offer it
+
+## Index status
+
+`obsidian.status` reports the local index without reading note bytes. It is available whenever the vault has a state directory, and it adds the embedding fields only when the vault has an embedding profile
+
+| Field | Meaning |
+|---|---|
+| `index.mode` | `sections` or `size`, the split that the index holds |
+| `index.files` | Visible files the index will consider: after the access, MIME, embedding scope and read-size rules |
+| `index.excluded` | Files that `indexing.exclude` or a `.gitignore` rule removes |
+| `index.indexed` | Files with an entry in the local full-text index; a note edited since the last scan still counts until a scan catches it |
+| `index.unindexed` | Candidate files with no entry yet |
+| `index.embedded` | Files with vectors for the current profile and split; a file with no vectors does not count |
+| `index.pending` | Queued files that exist and pass the embedding scope check; the worker reads each one before it sends anything |
+| `index.last_full_scan` | UTC time of the last full scan that ran to the end, or null |
+| `embeddings.*` | Provider, model, dimensions, the first twelve characters of the profile, whether the route is remote, whether sending is allowed, the daily budget, the default threshold and the enabled MIME types |
+| `spend.periods` | `24h`, `7d`, `30d` and `all`, each with `calls`, `reported`, `estimated`, `unknown_calls` and `local_calls` |
+| `spend.daily` | The last 30 days that hold calls, with the same split for each day |
+
+The counts show what the last scan found, filtered by the files that exist now: a deleted note leaves every count at once, and the next scan prunes its row. A note edited since the last scan still counts as indexed until a scan catches it. A `.gitignore` the server cannot parse raises an error instead of making every file look excluded
+
+The server adds reported and estimated prices separately and returns them as decimal strings. A call with no usable price lands in `unknown_calls` and never inside a sum. A local route records `local_calls` and no price. A reservation that a stopped process left behind counts as an estimate until the UTC day ends, the same way the daily budget counts it. The status call reads the journal and the two index tables; it does not call the provider and does not change the index
+
 ## Index exclusions
 
 Set `indexing.exclude` per vault to replace the default patterns `*.tmp`, `*.swp`, and `*~`. Patterns use `.gitignore` syntax relative to the vault root. An empty list disables these patterns. Hidden paths, including `.git`, and symlinks remain outside the index

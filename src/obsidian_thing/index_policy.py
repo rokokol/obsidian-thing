@@ -6,6 +6,10 @@ from pathspec import GitIgnoreSpec
 from .vault import Vault, VaultError, _parts
 
 
+class ExclusionError(VaultError):
+    pass
+
+
 @lru_cache(maxsize=64)
 def _parse(text: str) -> GitIgnoreSpec:
     return GitIgnoreSpec.from_lines(text.splitlines())
@@ -56,7 +60,7 @@ class IndexPolicy:
             relative = '/'.join(parts[:depth + 1])
             suffix = '/' if depth + 1 < len(parts) else ''
             if self.exclude.match_file(relative + suffix):
-                raise VaultError('The path is excluded from indexing')
+                raise ExclusionError('The path is excluded from indexing')
             if not self.respect_gitignore:
                 continue
             spec = self._ignore_at(parts[:depth])
@@ -65,6 +69,6 @@ class IndexPolicy:
             for base, spec in reversed(rules):
                 match = spec.check_file('/'.join(parts[base:depth + 1]) + suffix).include
                 if match is True:
-                    raise VaultError('The path is excluded from indexing by .gitignore')
+                    raise ExclusionError('The path is excluded from indexing by .gitignore')
                 if match is False:
                     break
